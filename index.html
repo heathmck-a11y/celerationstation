@@ -152,7 +152,7 @@
   .stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; gap: 18px; }
   .sheet { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; width: min(100%, 1000px); }
   @media (max-width: 700px) { .sheet { grid-template-columns: repeat(5, 1fr); } }
-  .sheet button { background: #fff; border: 2px solid var(--line); border-radius: 12px; height: clamp(58px, calc((100dvh - 320px) / 5), 120px); padding: 6px; color: var(--ink); display: flex; align-items: center; justify-content: center; position: relative; }
+  .sheet button { background: #fff; border: 2px solid var(--line); border-radius: 12px; height: clamp(48px, calc((100dvh - 320px) / var(--rows, 5)), 120px); padding: 6px; color: var(--ink); display: flex; align-items: center; justify-content: center; position: relative; }
   .sheet button svg { height: 100%; width: auto; max-width: 100%; }
   .sheet button.err { background: var(--unknown-bg); border-color: var(--unknown); color: var(--unknown); }
   .sheet button.err::after { content: "✗"; position: absolute; top: 2px; right: 6px; font-size: 0.9rem; font-weight: 700; }
@@ -380,11 +380,12 @@
   let savedCache = {}, saveError = false, saveChain = Promise.resolve(), noAccessNote = false;
 
   function normalize(d) {
-    const out = { students: [], sets: [], settings: Object.assign({}, DEFAULTS) };
+    const out = { students: [], sets: [], probes: [], settings: Object.assign({}, DEFAULTS) };
     if (d && typeof d === "object") {
       if (Array.isArray(d.students)) out.students = d.students.filter((s) => s && typeof s.name === "string");
       if (Array.isArray(d.sets)) out.sets = d.sets.filter((s) => s && typeof s.name === "string" && Array.isArray(s.items));
       if (d.settings && typeof d.settings === "object") Object.assign(out.settings, d.settings);
+      if (Array.isArray(d.probes)) out.probes = d.probes.filter((p) => p && Array.isArray(p.items) && p.code);
     }
     out.students.forEach((s) => { if (!s.id) s.id = uid(); if (!Array.isArray(s.sessions)) s.sessions = []; if (!Array.isArray(s.phases)) s.phases = []; });
     out.sets.forEach((s) => { if (!s.id) s.id = uid(); if (!(s.aim > 0)) s.aim = DEFAULT_AIM; if (!(s.errMax >= 0)) s.errMax = DEFAULT_ERR; });
@@ -396,7 +397,7 @@
   }
   // Remote layout: one doc per student ("s_<id>") and one "config" doc for letter sets and settings.
   function remoteDocs() {
-    const docs = { config: JSON.stringify({ kind: "config", sets: data.sets, settings: data.settings }) };
+    const docs = { config: JSON.stringify({ kind: "config", sets: data.sets, settings: data.settings, probes: data.probes || [] }) };
     data.students.forEach((s) => (docs["s_" + s.id] = JSON.stringify(Object.assign({ kind: "student" }, s))));
     return docs;
   }
@@ -412,10 +413,10 @@
         else if (dbCap && id) {
           const snap = await dbCap.collection("data/users/" + id).get();
           remoteDb = dbCap; remoteUid = id; mode = "claude";
-          const raw = { students: [], sets: [], settings: {} };
+          const raw = { students: [], sets: [], probes: [], settings: {} };
           snap.docs.filter((d) => d.exists).forEach((d) => {
             const v = JSON.parse(JSON.stringify(d.data()));
-            if (v.kind === "config") { raw.sets = v.sets || []; raw.settings = v.settings || {}; }
+            if (v.kind === "config") { raw.sets = v.sets || []; raw.settings = v.settings || {}; raw.probes = v.probes || []; }
             else if (v.kind === "student") { delete v.kind; raw.students.push(v); }
           });
           data = normalize(raw);
@@ -537,7 +538,10 @@
     glyphCache[key] = { src: c.toDataURL("image/png"), ratio: W / c.height };
     return glyphCache[key];
   }
-  async function probePdf(set, gradeKey, studentName) {
+  const probeCode = () => { const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let c = ""; for (let i = 0; i < 4; i++) c += A[Math.floor(Math.random() * A.length)]; return c; };
+  const probesFor = (st, setId) => (data.probes || []).filter((p) => p.setId === setId && (!p.sid || (st && p.sid === st.id))).sort((a, b) => b.made - a.made);
+  const probeLabel = (p) => `${p.code}, printed ${new Date(p.made).toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${new Date(p.made).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}${p.sid ? "" : " (not for one student)"}`;
+  async function probePdf(set, gradeKey, studentName, sid) {
     if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("jsPDF not loaded");
     const G0 = PROBE_GRADES[gradeKey] || PROBE_GRADES.K;
     const slide = isSlides(set);
@@ -549,6 +553,7 @@
     const pages = Math.max(1, Math.ceil(need / perPage));
     const items = sequence(set.items, pages * perPage);
     const made = new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+    const code = probeCode();
     const nameLine = studentName || "";
 
     // student copy
@@ -562,7 +567,7 @@
       doc.line(M + 0.6, M + 0.25, M + 4.2, M + 0.25);
       doc.text("Date:", M + 4.6, M + 0.2); doc.line(M + 5.1, M + 0.25, M + PW, M + 0.25);
       doc.setFontSize(9); doc.setTextColor(110);
-      doc.text(`${set.name}. Page ${pg + 1} of ${pages}.`, M, M + 0.5);
+      doc.text(`${set.name}. Probe ${code}. Page ${pg + 1} of ${pages}.`, M, M + 0.5);
       for (let r = 0; r < G.rows; r++) {
         const y = top + r * cellH;
         if (r > 0) { doc.setDrawColor(215); doc.line(M, y, M + PW, y); }
@@ -581,7 +586,7 @@
     let y = M;
     const header = () => {
       doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(0);
-      doc.text("Teacher scoring copy", M, y + 0.2);
+      doc.text(`Teacher scoring copy. Probe ${code}`, M, y + 0.2);
       doc.setFont("helvetica", "normal"); doc.setFontSize(10);
       doc.text(`Student: ${nameLine || "________________________"}    Set: ${set.name}    Date: __________`, M, y + 0.5);
       doc.text("Timing:  1 minute  /  30 seconds        Correct: ______    Errors: ______", M, y + 0.75);
@@ -608,7 +613,12 @@
     doc.setFontSize(8); doc.setTextColor(130);
     doc.text(`Made ${made} with Celeration Station. After the timing, enter the score with "Enter a timing done on paper."`, M, 10.7);
     const fname = `${(studentName ? studentName + "-" : "") + set.name}`.replace(/[^A-Za-z0-9 _-]/g, "").trim().replace(/\s+/g, "-") || "probe";
-    await download(`${fname}-probe-${todayStr()}.pdf`, doc.output("blob"), "application/pdf");
+    const ok = await download(`${fname}-probe-${code}.pdf`, doc.output("blob"), "application/pdf");
+    if (ok !== false) {
+      data.probes = (data.probes || []).concat({ id: uid(), code, setId: set.id, sid: sid || null, items, cols: G.cols, rows: G.rows, pages, grade: gradeKey, made: Date.now() });
+      if (data.probes.length > 80) data.probes = data.probes.slice(-80);
+      save();
+    }
   }
   async function svgToPng(svg) {
     const m = svg.match(/viewBox="0 0 (\d+) (\d+)"/);
@@ -667,7 +677,7 @@
       fmtDate(s.date) + (counted.has(s) ? "" : " *"), fmtLen(s.seconds), s.correct, s.errors,
       r1(perMin(s.correct, s.seconds)), r1(perMin(s.errors, s.seconds)),
       s.correct + s.errors ? Math.round(100 * s.correct / (s.correct + s.errors)) + "%" : "",
-      Object.entries(s.errorItems || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => k + (v > 1 ? ` x${v}` : "")).join(", ") || (s.manual ? "paper timing" : "none"),
+      Object.entries(s.errorItems || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => k + (v > 1 ? ` x${v}` : "")).join(", ") || (s.manual ? "typed-in score" : "none"),
     ], false, !counted.has(s)));
     if (list.some((s) => !counted.has(s))) { y += 0.06; text(`* Not counted: another timing that day counts (${data.settings.sameDay === "first" ? "first" : "best"} timing of the day).`, 8.5, "normal", 0, 110); }
     const phases = phasesFor(st, set.id);
@@ -686,10 +696,10 @@
     catch (e) { console.error(e); tell("The PDF could not be made. Check your internet connection and try again."); }
     finally { btn.disabled = false; btn.textContent = label; }
   }
-  async function printProbe(btn, set, gradeKey, studentName) {
+  async function printProbe(btn, set, gradeKey, studentName, sid) {
     const label = btn.textContent;
     btn.disabled = true; btn.textContent = "Making PDF…";
-    try { await probePdf(set, gradeKey, studentName); }
+    try { await probePdf(set, gradeKey, studentName, sid); render(); }
     catch (e) { console.error(e); tell("The PDF could not be made. Check your internet connection and try again."); }
     finally { btn.disabled = false; btn.textContent = label; }
   }
@@ -835,7 +845,7 @@
       return Object.assign(out, { tone: "change", title: "Fix errors before building speed.",
         text: `Errors were above ${set.errMax} per minute on the last 2 timings.`,
         bullets: [
-          `Error letters in this phase: ${missedList.length ? missedList.slice(0, 6).map((k) => `${withClue(k)}, missed ${missed[k]}`).join("; ") : "not recorded (paper timing)"}.`,
+          `Error letters in this phase: ${missedList.length ? missedList.slice(0, 6).map((k) => `${withClue(k)}, missed ${missed[k]}`).join("; ") : "not recorded (typed-in score)"}.`,
           "Before each timing, correct those sounds: model the sound, have the student say it, then mix it with known letters.",
           "If the same letters keep coming up, take them out into a smaller set for a few days.",
           "Draw a phase change line when you change the plan."],
@@ -1144,7 +1154,7 @@
     const others = sortedStudents().filter((x) => x.id !== st.id);
     const su = currentSetup(st), set = su.setId && getSet(su.setId);
     const summary = [set ? `Letter set: ${set.name}` : null, st.grade ? `Grade: ${GRADE_NAMES[st.grade]}` : null,
-      `Timing length: ${fmtLen(su.seconds)}`, `Show letters: ${su.mode === "cards" ? "one at a time (computer)" : su.mode === "paper" ? "paper timing" : "full page (computer)"}`, `Sprint length: ${fmtLen(su.sprintSeconds)}`].filter(Boolean);
+      `Timing length: ${fmtLen(su.seconds)}`, `Show letters: ${su.mode === "cards" ? "one at a time (computer)" : su.mode === "paper" ? "printed probe (student reads from paper)" : "full page (computer)"}`, `Sprint length: ${fmtLen(su.sprintSeconds)}`].filter(Boolean);
     const back = document.createElement("div");
     back.className = "modal-back"; back.id = "modal";
     back.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
@@ -1200,6 +1210,7 @@
     const sseg = (key, opts) => `<div class="seg" role="group">${opts.map(([v, label]) => `<button data-ssetting="${key}" data-val="${v}" aria-pressed="${String(pref(st, key)) === String(v)}">${label}</button>`).join("")}</div>`;
     const ss = startSet && getSet(startSet);
     const isPaper = pref(st, "mode") === "paper";
+    const paperProbes = ss ? probesFor(st, ss.id) : [];
 
     const startPanel = data.sets.length ? `<div class="panel">
         <h3>Do a timing</h3>
@@ -1208,19 +1219,25 @@
             <button class="btn small" id="newSetFromStudent">Make a new set</button></div>
           <span></span><div>${ss ? chips(ss.items, "", isSlides(ss)) : ""}</div>
           <span>Timing length</span>${sseg("seconds", [[30, "30 seconds"], [60, "1 minute"]])}
-          <span>Show letters</span><div class="row">${sseg("mode", [["sheet", "Full page (computer)"], ["cards", "One at a time (computer)"], ["paper", "Paper timing"]])}
-            ${isPaper ? `<span class="row" style="gap:8px">${gradeSelect("probeGrade", st.grade)}<button class="btn" id="printProbe">Print paper probe (PDF)</button></span>` : ""}</div>
+          <span>Show letters</span>${sseg("mode", [["sheet", "Full page (computer)"], ["cards", "One at a time (computer)"], ["paper", "Printed probe (student reads from paper)"]])}
+          ${isPaper ? `<span>Printed probe</span><div class="row" style="gap:8px">${gradeSelect("probeGrade", st.grade)}<button class="btn" id="printProbe">Print paper probe (PDF)</button></div>` : ""}
         </div>
-        ${isPaper ? `<div class="panel" style="background:var(--blue-soft);border-color:#B2D9D4;margin:0">
-          <p style="margin:0 0 10px"><strong>After the paper timing, enter the score here.</strong> <span class="counts">Use the teacher scoring copy: the row total at the bracket is the number answered.</span></p>
+        ${isPaper ? (paperProbes.length ? `<div class="row" style="margin-bottom:12px">
+            <label class="f" style="flex-direction:row;align-items:center;gap:8px">Probe the student has<select id="paperProbe">${paperProbes.map((p) => `<option value="${p.id}">${esc(probeLabel(p))}</option>`).join("")}</select></label></div>
+          <p class="note" style="margin:-4px 0 12px">The student reads from the printed probe. Your screen shows the same letters in the same order and layout, so you time and mark errors on the computer.</p>
+          <div class="row"><button class="btn primary" id="startPaper">Get ready</button><button class="linkbtn" id="toggleManual">${ui.showManual ? "Hide manual entry" : "Enter a paper timing manually"}</button></div>`
+          : `<p class="note" style="margin:0 0 12px">Print a probe for this set first. The app remembers it, so your screen can show the same letters in the same order while the student reads from paper.</p>
+          <div class="row"><button class="linkbtn" id="toggleManual">${ui.showManual ? "Hide manual entry" : "Enter a paper timing manually"}</button></div>`)
+          : `<div class="row"><button class="btn primary" id="startRun">Get ready</button><button class="linkbtn" id="toggleManual">${ui.showManual ? "Hide manual entry" : "Enter a paper timing manually"}</button></div>`}
+        ${ui.showManual ? `<div class="panel" style="background:var(--blue-soft);border-color:#B2D9D4;margin:12px 0 0">
+          <p style="margin:0 0 10px"><strong>Enter a paper timing manually.</strong> <span class="counts">For a timing scored on the teacher copy: the row total at the bracket is the number answered.</span></p>
           <div class="row" style="align-items:flex-end">
           <label class="f">Date<input type="date" id="mDate" value="${todayStr()}"></label>
           <label class="f">Correct<input type="number" id="mCorrect" min="0" inputmode="numeric"></label>
           <label class="f">Errors<input type="number" id="mErrors" min="0" inputmode="numeric"></label>
           <label class="f">Length<select id="mSec">${[[30, "30 seconds"], [60, "1 minute"], [120, "2 minutes"]].map(([v, l]) => `<option value="${v}" ${Number(pref(st, "seconds")) === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
           <label class="f" style="flex:1 1 180px">Error ${ss && isSlides(ss) ? "slides" : "letters"} (optional)<input type="text" id="mItems" placeholder="${ss && isSlides(ss) ? "for example: ma si" : "for example: b d e e"}"></label>
-          <button class="btn primary" id="saveManual">Save timing</button></div></div>`
-          : `<div class="row"><button class="btn primary" id="startRun">Get ready</button></div>`}
+          <button class="btn primary" id="saveManual">Save timing</button></div></div>` : ""}
       </div>` : `<div class="panel"><h3>Do a timing</h3><p class="note">First, choose the letters to assess and give the set a name so you can time it again.</p>
         <button class="btn primary" id="newSetFromStudent">Make a letter set</button></div>`;
 
@@ -1251,7 +1268,7 @@
           <td>${s.correct} (${r1(perMin(s.correct, s.seconds))}/min)</td>
           <td>${s.errors} (${r1(perMin(s.errors, s.seconds))}/min)</td>
           <td>${s.correct + s.errors ? Math.round(100 * s.correct / (s.correct + s.errors)) + "%" : ""}</td>
-          <td>${Object.keys(s.errorItems || {}).length ? Object.entries(s.errorItems).sort((a, b) => b[1] - a[1]).map(([k, v]) => esc(k) + (v > 1 ? ` (${v})` : "")).join(", ") : s.manual ? "paper" : "none"}</td>
+          <td>${Object.keys(s.errorItems || {}).length ? Object.entries(s.errorItems).sort((a, b) => b[1] - a[1]).map(([k, v]) => esc(k) + (v > 1 ? ` (${v})` : "")).join(", ") : s.manual ? "typed-in score" : "none"}</td>
           <td><button class="btn small danger" data-delsession="${s.id}">Delete</button></td></tr>`).join("");
       chartPart = `
         <div class="row spread" style="margin:26px 0 10px"><h2 style="margin:0">${esc(cs.name)}</h2>${chooser}</div>
@@ -1452,7 +1469,7 @@
     const left = Math.max(0, run.remaining);
     const clock = `${Math.floor(Math.ceil(left) / 60)}:${String(Math.ceil(left) % 60).padStart(2, "0")}`;
     const bar = `<div class="run-bar">
-      <div><span class="who">${esc(st.name)}</span> <span class="meta">${esc(set.name)}, ${run.practice ? "practice sprint, " : ""}${fmtLen(run.seconds)}</span></div>
+      <div><span class="who">${esc(st.name)}</span> <span class="meta">${esc(set.name)}, ${run.practice ? "practice sprint, " : ""}${run.paper ? `paper probe ${run.probeCode}, ` : ""}${fmtLen(run.seconds)}</span></div>
       <div class="row">${run.mode === "sheet" && run.state === "running" ? `<span class="markcount">Errors: ${run.errors.size}</span>
         <button class="btn small" id="undoMark" ${run.markOrder.length ? "" : "disabled"}>Undo last mark</button>` : ""}
         <span class="clock ${run.state === "review" ? "done" : ""}" id="clock">${run.state === "review" ? "Time" : clock}</span>
@@ -1461,7 +1478,13 @@
       return `<div class="run">${bar}<div class="stage"><div class="ready">
         <h2>${run.practice ? "Practice sprint" : "Ready"}</h2>
         ${run.practice ? `<p class="note">${fmtLen(run.seconds)} sprint. The score shows at the end and is not saved to the chart.</p>` : ""}
-        ${run.mode === "sheet" ? `<ul>
+        ${run.paper ? `<ul>
+          <li>Give the student printed probe <strong>${esc(run.probeCode)}</strong>. Check that the code at the top of their page matches.</li>
+          <li>The student reads from the paper. Your screen shows the same page, in the same order.</li>
+          <li>Tap a letter to mark an error (wrong sound, or no answer after about 3 seconds). Tap it again to undo. Self-corrections count as correct.</li>
+          <li>Tap Next page when the student turns the page.</li>
+          <li>When time is up, tap the last letter the student answered.</li></ul>`
+        : run.mode === "sheet" ? `<ul>
           <li>The student says the sound of each letter, reading across each row.</li>
           <li>Tap a letter to mark an error (wrong sound, or no answer after about 3 seconds; then point to the next letter). Tap it again to undo.</li>
           <li>Self-corrections count as correct. If the student fixes a sound within about 3 seconds, tap the letter again to remove the error mark.</li>
@@ -1471,7 +1494,7 @@
           <li>Tap Correct or Incorrect. Keyboard: <kbd>→</kbd> or <kbd>C</kbd> correct, <kbd>←</kbd> or <kbd>X</kbd> incorrect, <kbd>Backspace</kbd> undo.</li>
           <li>If there's no answer after about 3 seconds, tap Incorrect.</li>
           <li>Self-corrections count as correct. If you tapped Incorrect and the student fixes the sound within about 3 seconds, tap Undo, then Correct.</li></ul>`}
-        ${run.mode === "sheet" ? `<p class="counts" style="margin:0 0 6px">Error marks while the timer runs:</p>
+        ${run.mode === "sheet" && !run.paper ? `<p class="counts" style="margin:0 0 6px">Error marks while the timer runs:</p>
         <div class="seg" role="group" style="margin-bottom:14px">
           <button data-setting="markStyle" data-val="quiet" aria-pressed="${(data.settings.markStyle || "hidden") === "quiet"}">Small gray dot</button>
           <button data-setting="markStyle" data-val="hidden" aria-pressed="${(data.settings.markStyle || "hidden") === "hidden"}">Hidden</button>
@@ -1490,9 +1513,10 @@
       </div></div>`;
     }
     // sheet
-    const pages = Math.ceil(run.items.length / PAGE);
-    const from = run.page * PAGE;
-    const cells = run.items.slice(from, from + PAGE).map((x, i) => {
+    const PG = run.pageSize || PAGE;
+    const pages = Math.ceil(run.items.length / PG);
+    const from = run.page * PG;
+    const cells = run.items.slice(from, from + PG).map((x, i) => {
       const idx = from + i;
       const cls = [run.errors.has(idx) ? "err" : "", run.last !== null && idx > run.last ? "past" : "", run.last === idx ? "last" : ""].join(" ");
       return `<button class="${cls}" data-cell="${idx}" aria-label="${esc(x)}${run.errors.has(idx) ? ", marked error" : ""}">${glyphSVG(x, run.slide)}</button>`;
@@ -1507,11 +1531,11 @@
         <button data-tap="errors" aria-pressed="${run.tap === "errors"}">Fix error marks</button></div></div>`;
     }
     return `<div class="run">${bar}${msg}<div class="stage">
-      <div class="sheet ${run.state === "running" && data.settings.markStyle !== "red" ? "m-" + (data.settings.markStyle || "hidden") : ""}">${cells}</div>
+      <div class="sheet ${!run.paper && run.state === "running" && data.settings.markStyle !== "red" ? "m-" + (data.settings.markStyle || "hidden") : ""}"${run.cols ? ` style="grid-template-columns:repeat(${run.cols},1fr);--rows:${run.rows}"` : ""}>${cells}</div>
       <div class="sheet-nav">
         <button class="btn" id="prevPage" ${run.page === 0 ? "disabled" : ""}>Previous page</button>
-        <span>Page ${run.page + 1}${run.state === "review" ? ` of ${pages}` : ""}</span>
-        <button class="btn primary" id="nextPage">Next page</button>
+        <span>${run.paper ? `Student page ${run.page + 1} of ${pages}` : `Page ${run.page + 1}${run.state === "review" ? ` of ${pages}` : ""}`}</span>
+        <button class="btn primary" id="nextPage" ${run.paper && run.page >= pages - 1 ? "disabled" : ""}>Next page</button>
       </div></div></div>`;
   }
 
@@ -1572,16 +1596,18 @@
       o.start(); o.stop(audioCtx.currentTime + 0.7);
     } catch (e) { /* no sound */ }
   }
-  function startRun(sid, setId, practice) {
+  function startRun(sid, setId, practice, probeId) {
     const set = getSet(setId);
     if (!set || !set.items.length) { tell("Choose a letter set first."); return; }
     const stu = getStudent(sid);
     let mode = practice ? pref(stu, "sprintMode") : pref(stu, "mode");
     if (mode !== "cards") mode = "sheet";
+    const probe = probeId ? (data.probes || []).find((p) => p.id === probeId) : null;
     const secs = practice ? (Number(pref(stu, "sprintSeconds")) || 15) : (Number(pref(stu, "seconds")) || 60);
     run = { sid, setId, slide: isSlides(set), practice: !!practice, mode, seconds: secs, state: "ready",
       items: sequence(set.items, mode === "sheet" ? PAGE * 4 : 400), page: 0, errors: new Set(), last: null,
-      remaining: secs, cardIdx: 0, log: [], tap: "last", markOrder: [] };
+      remaining: secs, cardIdx: 0, log: [], tap: "last", markOrder: [], pageSize: PAGE, cols: null };
+    if (probe) Object.assign(run, { mode: "sheet", paper: true, probeCode: probe.code, items: probe.items.slice(), pageSize: probe.cols * probe.rows, cols: probe.cols, rows: probe.rows });
     go("run");
   }
   function beginTiming() {
@@ -1616,7 +1642,7 @@
     const errIdx = [...run.errors].filter((i) => i <= last);
     const errorItems = {};
     errIdx.forEach((i) => (errorItems[run.items[i]] = (errorItems[run.items[i]] || 0) + 1));
-    finishRun({ sid: run.sid, setId: run.setId, seconds: run.seconds, mode: "sheet", date: todayStr(),
+    finishRun({ sid: run.sid, setId: run.setId, seconds: run.seconds, mode: run.paper ? "paper" : "sheet", probe: run.probeCode || undefined, date: todayStr(),
       correct: last + 1 - errIdx.length, errors: errIdx.length, errorItems });
   }
   function finishRun(result) {
@@ -1642,7 +1668,7 @@
   function saveSession(p, date) {
     const st = getStudent(p.sid), set = getSet(p.setId);
     st.sessions.push({ id: uid(), at: Date.now(), date, setId: p.setId, setName: set ? set.name : "", seconds: p.seconds,
-      correct: p.correct, errors: p.errors, errorItems: p.errorItems || {}, mode: p.mode, manual: !!p.manual });
+      correct: p.correct, errors: p.errors, errorItems: p.errorItems || {}, mode: p.mode, manual: !!p.manual, probe: p.probe });
     ui.chartSet[st.id] = p.setId; ui.startSet[st.id] = p.setId;
     st.setup = Object.assign({}, st.setup || {}, { setId: p.setId });
     save();
@@ -1742,8 +1768,9 @@
       if ($("chartSet")) $("chartSet").onchange = (e) => { ui.chartSet[st.id] = e.target.value; render(); };
       if ($("newSetFromStudent")) $("newSetFromStudent").onclick = () => openSetEditor(null, { name: "student", id: st.id });
       if ($("startRun")) $("startRun").onclick = () => startRun(st.id, $("startSet").value);
+      if ($("startPaper")) $("startPaper").onclick = () => startRun(st.id, $("startSet").value, false, $("paperProbe").value);
       if ($("probeGrade")) $("probeGrade").onchange = (e) => { st.grade = e.target.value; data.settings.probeGrade = e.target.value; save(); render(); };
-      if ($("printProbe")) $("printProbe").onclick = (e) => printProbe(e.currentTarget, getSet($("startSet").value), $("probeGrade").value, st.name);
+      if ($("printProbe")) $("printProbe").onclick = (e) => printProbe(e.currentTarget, getSet($("startSet").value), $("probeGrade").value, st.name, st.id);
       if ($("stGrade")) $("stGrade").onchange = (e) => { st.grade = e.target.value || undefined; if (st.grade) data.settings.probeGrade = st.grade; save(); render(); };
       if ($("toggleHide")) $("toggleHide").onclick = async () => {
         if (!st.hidden && !(await ask(`Hide ${st.name}? Their timings stay saved, but they won't show on the Today page. You can unhide them from the bottom of the Students page.`, "Hide"))) return;
@@ -1838,7 +1865,7 @@
       $("saveSettings").onclick = () => { const v = Number($("minCel").value); if (v >= 1) { data.settings.minCel = v; save(); tell("Saved."); } else tell("Enter a number of 1 or more, such as 1.25."); };
       $("eraseAll").onclick = async () => {
         if (await ask("Erase all students, timings, and letter sets? Download a backup first if you may need them.", "Erase all", true)) {
-          data = { students: [], sets: [], settings: Object.assign({}, DEFAULTS) }; save(); go("home");
+          data = { students: [], sets: [], probes: [], settings: Object.assign({}, DEFAULTS) }; save(); go("home");
         }
       };
     }
@@ -1866,6 +1893,8 @@
             const inc = normalize(JSON.parse(rd.result));
             let addS = 0, addT = 0, addSets = 0;
             inc.sets.forEach((s) => { if (!getSet(s.id)) { data.sets.push(s); addSets++; } });
+            const haveP = new Set((data.probes || []).map((x) => x.id));
+            data.probes = (data.probes || []).concat((inc.probes || []).filter((x) => !haveP.has(x.id)));
             inc.students.forEach((s) => {
               const cur = getStudent(s.id);
               if (!cur) { data.students.push(s); addS++; addT += s.sessions.length; return; }
@@ -1905,8 +1934,10 @@
       document.querySelectorAll("[data-tap]").forEach((b) => b.onclick = () => { run.tap = b.dataset.tap; render(); });
       if ($("prevPage")) $("prevPage").onclick = () => { if (run.page > 0) { run.page--; render(); } };
       if ($("nextPage")) $("nextPage").onclick = () => {
+        const PG = run.pageSize || PAGE;
+        if (run.paper) { if ((run.page + 1) * PG < run.items.length) { run.page++; render(); } return; }
         run.page++;
-        if ((run.page + 1) * PAGE > run.items.length) run.items = run.items.concat(sequence(getSet(run.setId).items, PAGE * 2, run.items[run.items.length - 1]));
+        if ((run.page + 1) * PG > run.items.length) run.items = run.items.concat(sequence(getSet(run.setId).items, PG * 2, run.items[run.items.length - 1]));
         render();
       };
       if ($("toResults")) $("toResults").onclick = () => { if (run.last === null) { run.tap = "last"; render(); return; } finishSheet(); };
