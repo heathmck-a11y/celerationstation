@@ -99,8 +99,11 @@
   .pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 8px; margin: 8px 0 14px; }
   .pick button { height: 74px; border-radius: 10px; border: 2px solid var(--line); background: var(--none-bg); color: #8B99A4; padding: 4px; display: flex; align-items: center; justify-content: center; }
   .pick button svg { height: 100%; width: auto; max-width: 100%; }
-  .pick.slides { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
-  .pick.slides button { height: 86px; }
+  .pick.slides { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 12px; padding-top: 6px; }
+  .pick.slides button { height: 86px; position: relative; }
+  .pick.slides button::after { content: "×"; position: absolute; top: -8px; right: -8px; width: 20px; height: 20px; line-height: 18px; border-radius: 50%;
+    font-size: 1rem; font-weight: 700; color: var(--unknown); background: #fff; border: 1px solid #E3B8BD; }
+  .pick.slides button[aria-pressed="false"]::after { content: "+"; color: var(--blue); border-color: var(--line); }
   .pick button[aria-pressed="true"] { background: var(--blue-soft); border-color: var(--blue); color: var(--ink); }
   .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
   .chip { display: inline-flex; align-items: center; justify-content: center; height: 34px; min-width: 30px; padding: 2px 4px; border-radius: 7px; background: var(--none-bg); color: var(--ink); }
@@ -1283,7 +1286,8 @@
       </div>
       <div class="panel">
         <h3>Slides (${on.length} of ${combos.length} included)</h3>
-        ${combos.length ? `<div class="pick slides">${combos.map((x) => `<button data-slide="${x}" aria-pressed="${!off.has(x)}" aria-label="${x}${off.has(x) ? ", left out" : ""}">${glyphSVG(x, true)}</button>`).join("")}</div>`
+        ${combos.length ? `<p class="note" style="margin:0 0 6px">Tap × to take a slide out. Tap + to put it back. ce and ci are left out automatically because the c is soft. Tap + if you want them.</p>
+          <div class="pick slides">${combos.map((x) => `<button data-slide="${x}" aria-pressed="${!off.has(x)}" aria-label="${off.has(x) ? `Put ${x} back` : `Take ${x} out`}" title="${off.has(x) ? "Left out. Tap to put back." : "Tap to take out."}">${glyphSVG(x, true)}</button>`).join("")}</div>`
           : `<p class="note" style="margin:0">Pick at least one consonant and one vowel.</p>`}
       </div>
       ${setDetailsPanel(editingUsed, "for example: Slides, m s t with a and i")}`, "sets");
@@ -1591,6 +1595,7 @@
           kind: existing.kind || "letters", cons: (existing.cons || []).slice(), vows: (existing.vows || []).slice(), off: [] }
       : { id: null, name: "", items: [], aim: DEFAULT_AIM, errMax: DEFAULT_ERR, returnTo, kind: "letters", cons: [], vows: [], off: [] };
     if (draft.kind === "slides") draft.off = slideCombos(draft).filter((x) => !draft.items.includes(x));
+    draft.softSeen = slideCombos(draft).filter((x) => x === "ce" || x === "ci");
     go("setEdit");
   }
   function readDraftFields() {
@@ -1720,6 +1725,7 @@
         openSetEditor(null, { name: "sets" });
         Object.assign(draft, { name: s.name + " (copy)", items: s.items.slice(), aim: s.aim, errMax: s.errMax, kind: s.kind || "letters", cons: (s.cons || []).slice(), vows: (s.vows || []).slice() });
         if (draft.kind === "slides") draft.off = slideCombos(draft).filter((x) => !draft.items.includes(x));
+        draft.softSeen = slideCombos(draft).filter((x) => x === "ce" || x === "ci");
         render();
       });
       document.querySelectorAll("[data-delset]").forEach((b) => b.onclick = async () => {
@@ -1749,13 +1755,15 @@
       });
       document.querySelectorAll("[data-kind]").forEach((b) => b.onclick = () => { readDraftFields(); draft.kind = b.dataset.kind; render(); });
       const toggle = (arr, x) => { const i = arr.indexOf(x); if (i >= 0) arr.splice(i, 1); else arr.push(x); };
-      document.querySelectorAll("[data-pickc]").forEach((b) => b.onclick = () => { readDraftFields(); toggle(draft.cons, b.dataset.pickc); render(); });
-      document.querySelectorAll("[data-pickv]").forEach((b) => b.onclick = () => { readDraftFields(); toggle(draft.vows, b.dataset.pickv); render(); });
+      // ce and ci make a soft c, so they start out left out (once each; the teacher can put them back)
+      const softC = () => { draft.softSeen = draft.softSeen || []; slideCombos(draft).forEach((x) => { if ((x === "ce" || x === "ci") && !draft.softSeen.includes(x)) { draft.softSeen.push(x); if (!draft.off.includes(x)) draft.off.push(x); } }); };
+      document.querySelectorAll("[data-pickc]").forEach((b) => b.onclick = () => { readDraftFields(); toggle(draft.cons, b.dataset.pickc); softC(); render(); });
+      document.querySelectorAll("[data-pickv]").forEach((b) => b.onclick = () => { readDraftFields(); toggle(draft.vows, b.dataset.pickv); softC(); render(); });
       document.querySelectorAll("[data-slide]").forEach((b) => b.onclick = () => { readDraftFields(); toggle(draft.off, b.dataset.slide); render(); });
       document.querySelectorAll("[data-cpreset]").forEach((b) => b.onclick = () => {
         readDraftFields();
         draft.cons = b.dataset.cpreset === "bak1" ? BAK1.filter((l) => !VOWELS.includes(l)) : [];
-        render();
+        softC(); render();
       });
       $("saveSet").onclick = saveDraft;
       $("cancelSet").onclick = $("cancelSet2").onclick = () => leaveSetEditor(null);
