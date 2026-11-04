@@ -448,8 +448,8 @@
           }
         } else loadLocal();
       } catch (e) { console.error("Could not load from Claude", e); loadLocal(); }
-      loading = false; ensureDefaultSets(); render();
-    } else { loadLocal(); ensureDefaultSets(); render(); }
+      loading = false; ensureDefaultSets(); render(); restoreRun();
+    } else { loadLocal(); ensureDefaultSets(); render(); restoreRun(); }
   }
   // Built-in "All 26 letters" set. If the teacher deletes it, it stays deleted.
   const ALL_ID = "all-26-letters";
@@ -1676,23 +1676,25 @@
   }
 
   function resultsView() {
-    const p = pending, st = getStudent(p.sid), set = getSet(p.setId);
-    const errList = Object.entries(p.errorItems).sort((a, b) => b[1] - a[1] || itemSort(a[0], b[0]));
-    return shell(`<h2>${esc(st.name)}: ${esc(set.name)}</h2>
-      <p class="note">${fmtLen(p.seconds)} timing. Check the numbers, then save.</p>
+    const st = getStudent(pending.sid), p = st && st.sessions.find((x) => x.id === pending.sessionId);
+    if (!p) { pending = null; view = { name: "home" }; return homeView(); }
+    const set = getSet(p.setId);
+    const errList = Object.entries(p.errorItems || {}).sort((a, b) => b[1] - a[1] || itemSort(a[0], b[0]));
+    return shell(`<h2>${esc(st.name)}: ${esc(set ? set.name : p.setName)}</h2>
+      <p class="note"><strong style="color:var(--known)">✓ Saved to the chart.</strong> ${fmtLen(p.seconds)} timing${p.probe ? `, printed probe ${esc(p.probe)}` : ""}.</p>
       <div class="panel">
         <div class="stats">
           <div class="stat c"><div class="v">${p.correct}</div><div class="k">correct${p.seconds !== 60 ? ` (${r1(perMin(p.correct, p.seconds))} per minute)` : " per minute"}</div></div>
           <div class="stat e"><div class="v">${p.errors}</div><div class="k">errors${p.seconds !== 60 ? ` (${r1(perMin(p.errors, p.seconds))} per minute)` : " per minute"}</div></div>
           <div class="stat"><div class="v">${p.correct + p.errors ? Math.round(100 * p.correct / (p.correct + p.errors)) : 0}%</div><div class="k">accurate</div></div>
         </div>
-        <h3 style="margin-top:12px">Error letters</h3>
+        <h3 style="margin-top:12px">Error ${set && isSlides(set) ? "slides" : "letters"}</h3>
         ${errorListHTML(errList, isSlides(set))}
         ${correctNowHTML(errList, isSlides(set))}
         <div class="row" style="margin-top:16px;align-items:flex-end">
-          <label class="f">Date<input type="date" id="rDate" value="${p.date}"></label>
-          <button class="btn primary" id="saveResult">Save and chart</button>
-          <button class="btn danger" id="discard">Discard</button>
+          <label class="f">Date (change it if needed)<input type="date" id="rDate" value="${p.date}"></label>
+          <button class="btn primary" id="saveResult">See the chart</button>
+          <button class="btn danger" id="discard">Delete this timing</button>
         </div>
       </div>`, "home");
   }
@@ -1737,6 +1739,7 @@
   function tick() {
     if (!run || run.state !== "running") { clearInterval(timerId); return; }
     run.remaining = (run.endAt - performance.now()) / 1000;
+    if (!run._snapT || performance.now() - run._snapT > 2000) { run._snapT = performance.now(); snapshotRun(); }
     if (run.remaining <= 0) { clearInterval(timerId); timeUp(); return; }
     const c = $("clock"), tb = $("timebar"), low = run.remaining <= 10;
     if (c) { const s = Math.ceil(run.remaining); c.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; c.classList.toggle("low", low); }
@@ -1771,7 +1774,13 @@
       ui.sprintResult = result;
       (ui.sprints[result.sid] = ui.sprints[result.sid] || []).push(result);
       go("sprint");
-    } else { pending = result; go("results"); }
+    } else {
+      // every finished timing is saved right away; the results screen can change the date or delete it
+      const id = saveSession(result, result.date || todayStr());
+      pending = { sid: result.sid, sessionId: id };
+      clearRunSnapshot();
+      go("results");
+    }
   }
   function markCard(ok) {
     if (!run || run.state !== "running" || run.mode !== "cards") return;
@@ -1786,11 +1795,13 @@
   }
   function saveSession(p, date) {
     const st = getStudent(p.sid), set = getSet(p.setId);
-    st.sessions.push({ id: uid(), at: Date.now(), date, setId: p.setId, setName: set ? set.name : "", seconds: p.seconds,
+    const id = uid();
+    st.sessions.push({ id, at: Date.now(), date, setId: p.setId, setName: set ? set.name : "", seconds: p.seconds,
       correct: p.correct, errors: p.errors, errorItems: p.errorItems || {}, mode: p.mode, manual: !!p.manual, probe: p.probe });
     ui.chartSet[st.id] = p.setId; ui.startSet[st.id] = p.setId;
     st.setup = Object.assign({}, st.setup || {}, { setId: p.setId });
     save();
+    return id;
   }
   function openSetEditor(existing, returnTo, newKind) {
     draft = existing
@@ -1836,6 +1847,30 @@
   }
 
   // ---------- render + events ----------
+  const RUN_KEY = KEY + ".runInProgress";
+  function snapshotRun() {
+    if (!run || run.practice || run.state === "ready") return;
+    try {
+      const snap = Object.assign({}, run, { errors: [...run.errors], savedAt: Date.now(),
+        remaining: run.state === "running" ? (run.endAt - performance.now()) / 1000 : run.remaining, endAt: undefined });
+      localStorage.setItem(RUN_KEY, JSON.stringify(snap));
+    } catch (e) { /* no browser storage */ }
+  }
+  function clearRunSnapshot() { try { localStorage.removeItem(RUN_KEY); } catch (e) { /* */ } }
+  function restoreRun() {
+    let snap = null;
+    try { snap = JSON.parse(localStorage.getItem(RUN_KEY) || "null"); } catch (e) { snap = null; }
+    if (!snap || !getStudent(snap.sid) || !getSet(snap.setId) || Date.now() - snap.savedAt > 30 * 60 * 1000) { clearRunSnapshot(); return; }
+    run = Object.assign(snap, { errors: new Set(snap.errors || []) });
+    const left = run.state === "running" ? run.remaining - (Date.now() - snap.savedAt) / 1000 : run.remaining;
+    if (run.mode === "cards") { run.state = "running"; run.remaining = 0; finishCards(); tell("A timing in progress was interrupted. It has been saved with what was marked before the interruption."); return; }
+    if (run.state === "running" && left > 0) { run.state = "review"; run.tap = "last"; }
+    else { run.state = "review"; run.tap = "last"; }
+    run.flash = false; run.remaining = 0;
+    view = { name: "run" };
+    render();
+    tell(`A timing for ${getStudent(run.sid).name} was interrupted and has been brought back. ${run.last === null ? "Tap the last item the student answered, then Done to save it." : "Check the marks, then press Done to save it."} Press Cancel to throw it away.`);
+  }
   function render() {
     const app = $("app");
     if (loading) { app.innerHTML = shell("", ""); return; }
@@ -1852,6 +1887,7 @@
     else { view = { name: "home" }; html = homeView(); }
     app.innerHTML = html;
     bind();
+    if (view.name === "run" && run) snapshotRun();
   }
 
   function bind() {
@@ -2046,7 +2082,7 @@
       $("cancelRun").onclick = async () => {
         const wasRunning = run.state === "running";
         if (run.state === "ready" || await ask("Cancel this timing? Nothing will be saved.", "Cancel timing", true)) {
-          stopTimer(); const sid = run.sid; run = null; go("student", { id: sid });
+          stopTimer(); clearRunSnapshot(); const sid = run.sid; run = null; go("student", { id: sid });
         } else if (wasRunning && run && run.state === "running" && run.remaining <= 0) timeUp();
       };
       if ($("go")) $("go").onclick = beginTiming;
@@ -2081,12 +2117,14 @@
     }
 
     if (view.name === "results" && pending) {
-      $("saveResult").onclick = () => {
-        const date = $("rDate").value || todayStr();
-        const sid = pending.sid; saveSession(pending, date); pending = null; go("student", { id: sid });
-      };
+      const st = getStudent(pending.sid), sess = st && st.sessions.find((x) => x.id === pending.sessionId);
+      $("rDate").onchange = (e) => { if (sess && e.target.value) { sess.date = e.target.value; save(); } };
+      $("saveResult").onclick = () => { const sid = pending.sid; pending = null; go("student", { id: sid }); };
       $("discard").onclick = async () => {
-        if (await ask("Discard this timing?", "Discard", true)) { const sid = pending.sid; pending = null; go("student", { id: sid }); }
+        if (await ask("Delete this timing? It will be removed from the chart.", "Delete", true)) {
+          st.sessions = st.sessions.filter((x) => x.id !== pending.sessionId); save();
+          const sid = pending.sid; pending = null; go("student", { id: sid });
+        }
       };
     }
   }
