@@ -1131,6 +1131,57 @@
       </div>`, "today");
   }
 
+  const SETUP_KEYS = ["seconds", "mode", "sprintSeconds"];
+  const pref = (st, key) => st && st.setup && st.setup[key] !== undefined ? st.setup[key] : data.settings[key];
+  function currentSetup(st) {
+    const out = {};
+    SETUP_KEYS.forEach((k) => (out[k] = pref(st, k)));
+    const sid = ui.startSet[st.id] || (st.setup && st.setup.setId);
+    if (sid && getSet(sid)) out.setId = sid;
+    return out;
+  }
+  function copySetupDialog(st) {
+    const others = sortedStudents().filter((x) => x.id !== st.id);
+    const su = currentSetup(st), set = su.setId && getSet(su.setId);
+    const summary = [set ? `Letter set: ${set.name}` : null, st.grade ? `Grade: ${GRADE_NAMES[st.grade]}` : null,
+      `Timing length: ${fmtLen(su.seconds)}`, `Show letters: ${su.mode === "cards" ? "one at a time" : "full page"}`, `Sprint length: ${fmtLen(su.sprintSeconds)}`].filter(Boolean);
+    const back = document.createElement("div");
+    back.className = "modal-back"; back.id = "modal";
+    back.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
+      <p><strong>Copy ${esc(st.name)}'s setup</strong></p>
+      <ul style="margin:0 0 12px;padding-left:20px;color:var(--muted)">${summary.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
+      <label class="f" style="margin-bottom:10px">Copy to<select id="cpTarget">
+        ${others.map((x) => `<option value="${x.id}">${esc(x.name)}${x.hidden ? " (hidden)" : ""}</option>`).join("")}
+        <option value="__new" ${others.length ? "" : "selected"}>New student…</option></select></label>
+      <label class="f" id="cpNewWrap" style="margin-bottom:10px;${others.length ? "display:none" : ""}">New student's name<input type="text" id="cpName" autocomplete="off"></label>
+      <p class="counts" style="margin:0 0 14px">Only the setup is copied. Timings, phase change lines, and charts stay with ${esc(st.name)}.</p>
+      <div class="row"><button class="btn" id="cpCancel">Cancel</button><button class="btn primary" id="cpOk">Copy setup</button></div></div>`;
+    document.body.appendChild(back);
+    const sel = back.querySelector("#cpTarget"), wrap = back.querySelector("#cpNewWrap"), name = back.querySelector("#cpName");
+    const done = () => { back.remove(); document.removeEventListener("keydown", key, true); };
+    const key = (e) => { if (e.key === "Escape") { e.preventDefault(); done(); } else if (e.key === "Enter") { e.preventDefault(); ok(); } };
+    sel.onchange = () => { wrap.style.display = sel.value === "__new" ? "" : "none"; if (sel.value === "__new") name.focus(); };
+    const ok = () => {
+      let target;
+      if (sel.value === "__new") {
+        const n = name.value.trim();
+        if (!n) { name.focus(); return; }
+        target = { id: uid(), name: n, sessions: [], phases: [] };
+        data.students.push(target);
+      } else target = getStudent(sel.value);
+      if (!target) return;
+      target.setup = Object.assign({}, su);
+      if (st.grade) target.grade = st.grade;
+      if (su.setId) { ui.startSet[target.id] = su.setId; ui.chartSet[target.id] = su.setId; }
+      save(); done(); render();
+      tell(`Copied ${st.name}'s setup to ${target.name}.`);
+    };
+    back.querySelector("#cpOk").onclick = ok;
+    back.querySelector("#cpCancel").onclick = done;
+    document.addEventListener("keydown", key, true);
+    (others.length ? sel : name).focus();
+  }
+
   function setOptions(selected) {
     return sortedSets().map((s) => `<option value="${s.id}" ${s.id === selected ? "selected" : ""}>${esc(s.name)} (${s.items.length})</option>`).join("");
   }
@@ -1140,11 +1191,13 @@
     if (!st) { view = { name: "home" }; return homeView(); }
     const setsUsed = sortedSets().filter((x) => st.sessions.some((s) => s.setId === x.id));
     const lastS = st.sessions.slice().sort((a, b) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0))[0];
-    let startSet = ui.startSet[st.id] || (lastS && getSet(lastS.setId) ? lastS.setId : (data.sets[0] && sortedSets()[0].id));
+    let startSet = ui.startSet[st.id] || (st.setup && getSet(st.setup.setId) ? st.setup.setId : null) || (lastS && getSet(lastS.setId) ? lastS.setId : (data.sets[0] && sortedSets()[0].id));
     if (startSet && !getSet(startSet)) startSet = sortedSets()[0] && sortedSets()[0].id;
     let chartSet = ui.chartSet[st.id] || startSet;
     if (!getSet(chartSet)) chartSet = startSet;
     const seg = (key, opts) => `<div class="seg" role="group">${opts.map(([v, label]) => `<button data-setting="${key}" data-val="${v}" aria-pressed="${String(data.settings[key]) === String(v)}">${label}</button>`).join("")}</div>`;
+    // per-student choices (saved with the student, copied by "Copy setup")
+    const sseg = (key, opts) => `<div class="seg" role="group">${opts.map(([v, label]) => `<button data-ssetting="${key}" data-val="${v}" aria-pressed="${String(pref(st, key)) === String(v)}">${label}</button>`).join("")}</div>`;
     const ss = startSet && getSet(startSet);
 
     const startPanel = data.sets.length ? `<div class="panel">
@@ -1153,8 +1206,8 @@
           <span>Letter set</span><div class="row"><select id="startSet" aria-label="Letter set">${setOptions(startSet)}</select>
             <button class="btn small" id="newSetFromStudent">Make a new set</button></div>
           <span></span><div>${ss ? chips(ss.items, "", isSlides(ss)) : ""}</div>
-          <span>Timing length</span>${seg("seconds", [[30, "30 seconds"], [60, "1 minute"]])}
-          <span>Show letters</span>${seg("mode", [["sheet", "Full page (student reads across)"], ["cards", "One at a time"]])}
+          <span>Timing length</span>${sseg("seconds", [[30, "30 seconds"], [60, "1 minute"]])}
+          <span>Show letters</span>${sseg("mode", [["sheet", "Full page (student reads across)"], ["cards", "One at a time"]])}
         </div>
         <div class="row" style="margin-bottom:12px"><span class="counts">Paper probe size:</span>${gradeSelect("probeGrade", st.grade)}
           <button class="btn" id="printProbe">Print paper probe (PDF)</button></div>
@@ -1175,8 +1228,8 @@
         <p class="note" style="margin-bottom:12px">Short timed practice rounds. You see the score and missed letters at the end. Sprints are not saved to the chart.</p>
         <div class="setup-grid">
           <span>Letter set</span><select id="sprintSet" aria-label="Letter set for sprints" style="justify-self:start">${setOptions(startSet)}</select>
-          <span>Sprint length</span>${seg("sprintSeconds", [[10, "10 seconds"], [15, "15 seconds"], [20, "20 seconds"]])}
-          <span>Show letters</span>${seg("mode", [["sheet", "Full page"], ["cards", "One at a time"]])}
+          <span>Sprint length</span>${sseg("sprintSeconds", [[10, "10 seconds"], [15, "15 seconds"], [20, "20 seconds"]])}
+          <span>Show letters</span>${sseg("mode", [["sheet", "Full page"], ["cards", "One at a time"]])}
         </div>
         <div class="row"><button class="btn primary" id="startSprint">Start sprint</button>
           ${(ui.sprints[st.id] || []).length ? `<span class="counts">Today's sprints (correct/errors): ${ui.sprints[st.id].map((x) => `${x.correct}/${x.errors}`).join(", ")}</span>` : ""}</div>
@@ -1235,7 +1288,7 @@
       <p style="margin:0 0 10px"><button class="linkbtn" data-nav="home">All students</button></p>
       <div class="row spread" style="margin-bottom:16px"><div class="row"><h2 style="margin:0">${esc(st.name)}</h2>
           <select id="stGrade" aria-label="Grade"><option value="">Grade not set</option>${Object.entries(GRADE_NAMES).map(([k, v]) => `<option value="${k}" ${st.grade === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
-        <div class="row"><button class="btn small" id="rename">Rename</button><button class="btn small" id="toggleHide">${st.hidden ? "Unhide" : "Hide"}</button><button class="btn small danger" id="delStudent">Remove student</button></div></div>
+        <div class="row"><button class="btn small" id="copySetup">Copy setup to another student</button><button class="btn small" id="rename">Rename</button><button class="btn small" id="toggleHide">${st.hidden ? "Unhide" : "Hide"}</button><button class="btn small danger" id="delStudent">Remove student</button></div></div>
       ${st.hidden ? `<div class="panel" style="background:var(--blue-soft);border-color:#B2D9D4">This student is hidden. Their timings are saved, but they are left out of the Today page.</div>` : ""}
       ${startPanel}
       ${sprintPanel}
@@ -1521,9 +1574,10 @@
   function startRun(sid, setId, practice) {
     const set = getSet(setId);
     if (!set || !set.items.length) { tell("Choose a letter set first."); return; }
-    const secs = practice ? (Number(data.settings.sprintSeconds) || 15) : (Number(data.settings.seconds) || 60);
-    run = { sid, setId, slide: isSlides(set), practice: !!practice, mode: data.settings.mode, seconds: secs, state: "ready",
-      items: sequence(set.items, data.settings.mode === "sheet" ? PAGE * 4 : 400), page: 0, errors: new Set(), last: null,
+    const stu = getStudent(sid), mode = pref(stu, "mode");
+    const secs = practice ? (Number(pref(stu, "sprintSeconds")) || 15) : (Number(pref(stu, "seconds")) || 60);
+    run = { sid, setId, slide: isSlides(set), practice: !!practice, mode, seconds: secs, state: "ready",
+      items: sequence(set.items, mode === "sheet" ? PAGE * 4 : 400), page: 0, errors: new Set(), last: null,
       remaining: secs, cardIdx: 0, log: [], tap: "last", markOrder: [] };
     go("run");
   }
@@ -1587,6 +1641,7 @@
     st.sessions.push({ id: uid(), at: Date.now(), date, setId: p.setId, setName: set ? set.name : "", seconds: p.seconds,
       correct: p.correct, errors: p.errors, errorItems: p.errorItems || {}, mode: p.mode, manual: !!p.manual });
     ui.chartSet[st.id] = p.setId; ui.startSet[st.id] = p.setId;
+    st.setup = Object.assign({}, st.setup || {}, { setId: p.setId });
     save();
   }
   function openSetEditor(existing, returnTo) {
@@ -1673,7 +1728,14 @@
 
     if (view.name === "student") {
       const st = getStudent(view.id); if (!st) return;
-      if ($("startSet")) $("startSet").onchange = (e) => { ui.startSet[st.id] = e.target.value; ui.chartSet[st.id] = e.target.value; render(); };
+      const setSetup = (k, v) => { st.setup = Object.assign({}, st.setup || {}); st.setup[k] = v; };
+      if ($("startSet")) $("startSet").onchange = (e) => { ui.startSet[st.id] = e.target.value; ui.chartSet[st.id] = e.target.value; setSetup("setId", e.target.value); save(); render(); };
+      document.querySelectorAll("[data-ssetting]").forEach((b) => b.onclick = () => {
+        const k = b.dataset.ssetting, v = (k === "seconds" || k === "sprintSeconds") ? Number(b.dataset.val) : b.dataset.val;
+        setSetup(k, v); data.settings[k] = v;   // also the starting choice for new students
+        save(); render();
+      });
+      if ($("copySetup")) $("copySetup").onclick = () => copySetupDialog(st);
       if ($("chartSet")) $("chartSet").onchange = (e) => { ui.chartSet[st.id] = e.target.value; render(); };
       if ($("newSetFromStudent")) $("newSetFromStudent").onclick = () => openSetEditor(null, { name: "student", id: st.id });
       if ($("startRun")) $("startRun").onclick = () => startRun(st.id, $("startSet").value);
@@ -1685,7 +1747,7 @@
         st.hidden = !st.hidden; save(); render();
       };
       if ($("startSprint")) $("startSprint").onclick = () => startRun(st.id, $("sprintSet").value, true);
-      if ($("sprintSet")) $("sprintSet").onchange = (e) => { ui.startSet[st.id] = e.target.value; ui.chartSet[st.id] = e.target.value; render(); };
+      if ($("sprintSet")) $("sprintSet").onchange = (e) => { ui.startSet[st.id] = e.target.value; ui.chartSet[st.id] = e.target.value; setSetup("setId", e.target.value); save(); render(); };
       if ($("chartPdf")) $("chartPdf").onclick = (e) => { const cs = getSet(e.currentTarget.dataset.set); busy(e.currentTarget, () => chartPdf(st, cs)); };
       if ($("toggleManual")) $("toggleManual").onclick = () => { ui.showManual = !ui.showManual; render(); };
       if ($("saveManual")) $("saveManual").onclick = () => {
