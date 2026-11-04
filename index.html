@@ -427,8 +427,15 @@
           }
         } else loadLocal();
       } catch (e) { console.error("Could not load from Claude", e); loadLocal(); }
-      loading = false; render();
-    } else { loadLocal(); render(); }
+      loading = false; ensureDefaultSets(); render();
+    } else { loadLocal(); ensureDefaultSets(); render(); }
+  }
+  // Built-in "All 26 letters" set. If the teacher deletes it, it stays deleted.
+  const ALL_ID = "all-26-letters";
+  function ensureDefaultSets() {
+    if (data.settings.noAllLetters || data.sets.some((x) => x.id === ALL_ID)) return;
+    data.sets.push({ id: ALL_ID, name: "All 26 letters", items: LETTERS.slice(), aim: DEFAULT_AIM, errMax: DEFAULT_ERR, kind: "letters", builtin: true, created: todayStr() });
+    save();
   }
   function save() {
     if (mode === "local") {
@@ -1212,7 +1219,10 @@
     const kindSets = sortedSets().filter((x) => setKind(x) === kind);
     const kindWord = kind === "slides" ? "slide" : "letter";
     let startSet = ui.startSet[st.id] || (st.setup && getSet(st.setup.setId) ? st.setup.setId : null) || (lastS && getSet(lastS.setId) ? lastS.setId : null);
-    if (!startSet || !kindSets.some((x) => x.id === startSet)) startSet = kindSets[0] ? kindSets[0].id : null;
+    if (!startSet || !kindSets.some((x) => x.id === startSet)) {
+      const def = kind === "letters" && kindSets.find((x) => x.id === ALL_ID);
+      startSet = def ? def.id : kindSets[0] ? kindSets[0].id : null;
+    }
     let chartSet = ui.chartSet[st.id] || startSet || (lastS && lastS.setId);
     if (!getSet(chartSet)) chartSet = startSet;
     const seg = (key, opts) => `<div class="seg" role="group">${opts.map(([v, label]) => `<button data-setting="${key}" data-val="${v}" aria-pressed="${String(data.settings[key]) === String(v)}">${label}</button>`).join("")}</div>`;
@@ -1850,6 +1860,7 @@
         const n = data.students.reduce((k, st) => k + st.sessions.filter((x) => x.setId === s.id).length, 0);
         if (await ask(`Delete the set "${s.name}"?${n ? ` Its ${n} saved timing${n === 1 ? "" : "s"} and phase lines will be deleted too.` : ""}`, "Delete", true)) {
           data.sets = data.sets.filter((x) => x.id !== s.id);
+          if (s.id === ALL_ID) data.settings.noAllLetters = true;
           data.students.forEach((st) => { st.sessions = st.sessions.filter((x) => x.setId !== s.id); st.phases = st.phases.filter((p) => p.setId !== s.id); });
           save(); render();
         }
@@ -1890,7 +1901,7 @@
       $("saveSettings").onclick = () => { const v = Number($("minCel").value); if (v >= 1) { data.settings.minCel = v; save(); tell("Saved."); } else tell("Enter a number of 1 or more, such as 1.25."); };
       $("eraseAll").onclick = async () => {
         if (await ask("Erase all students, timings, and letter sets? Download a backup first if you may need them.", "Erase all", true)) {
-          data = { students: [], sets: [], probes: [], settings: Object.assign({}, DEFAULTS) }; save(); go("home");
+          data = { students: [], sets: [], probes: [], settings: Object.assign({}, DEFAULTS) }; ensureDefaultSets(); save(); go("home");
         }
       };
     }
