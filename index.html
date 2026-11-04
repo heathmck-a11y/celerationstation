@@ -1,0 +1,1840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Celeration Station</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40' aria-hidden='true'%3E%3Crect x='1' y='1' width='38' height='38' rx='9' fill='%23C8DC8A'/%3E%3Cpath d='M8 12H32M8 20H32M8 28H32M14 7V33M22 7V33M30 7V33' stroke='%230C5458' stroke-opacity='.22' stroke-width='1.2'/%3E%3Cpath d='M8 30 L32 11' stroke='%230C5458' stroke-width='3.2' stroke-linecap='round'/%3E%3Ccircle cx='12' cy='27' r='2.6' fill='%230C5458'/%3E%3Ccircle cx='20' cy='21' r='2.6' fill='%230C5458'/%3E%3Ccircle cx='28' cy='14' r='2.6' fill='%230C5458'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Fredoka:wght@600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #EBF4F3;
+    --panel: #FFFFFF;
+    --ink: #1B2A2B;
+    --muted: #55696A;
+    --line: #C4DAD7;
+    --blue: #11787A;
+    --blue-soft: #DAF0EE;
+    --brand-dark: #0C5458;
+    --brand-gold: #C8DC8A;
+    --known: #2F7D4E;
+    --known-bg: #DDF0E3;
+    --unknown: #A8323E;
+    --unknown-bg: #F6DEE0;
+    --none-bg: #E6F0EF;
+    --warn-bg: #FFF6DD;
+    --warn-line: #E8D49A;
+    --font: "Andika", "Century Gothic", "Trebuchet MS", system-ui, sans-serif;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html, body { margin: 0; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 17px; line-height: 1.5; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:disabled { cursor: default; opacity: 0.5; }
+  :focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+
+  header.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 20px; background: var(--brand-dark); border-bottom: 4px solid var(--brand-gold); color: #fff; }
+  header.top h1 { margin: 0; font-family: "Fredoka", var(--font); font-size: 1.45rem; font-weight: 600; letter-spacing: 0.01em; display: flex; align-items: center; gap: 10px; }
+  header.top .logo { width: 34px; height: 34px; flex: none; }
+  nav { display: flex; gap: 6px; flex-wrap: wrap; }
+  nav button { background: none; border: 1px solid transparent; border-radius: 8px; padding: 6px 12px; color: #D2ECEA; }
+  nav button:hover { color: #fff; background: rgba(255,255,255,0.08); }
+  nav button[aria-current="page"] { background: var(--brand-gold); color: var(--brand-dark); font-weight: 700; }
+  header.top :focus-visible { outline-color: var(--brand-gold); }
+  h2 { font-family: "Fredoka", var(--font); font-weight: 600; }
+
+  main { max-width: 1060px; margin: 0 auto; padding: 24px 20px 48px; }
+  h2 { font-size: 1.6rem; margin: 0 0 4px; }
+  h3 { font-size: 1.15rem; margin: 0 0 10px; }
+  p.note { color: var(--muted); margin: 0 0 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; margin-bottom: 18px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .spread { justify-content: space-between; }
+  .btn { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 9px 16px; }
+  .btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 700; }
+  .btn.danger { color: var(--unknown); border-color: #E3B8BD; }
+  .btn.small { padding: 5px 10px; font-size: 0.9rem; }
+  .linkbtn { background: none; border: none; color: var(--blue); padding: 0; text-decoration: underline; }
+  input[type="text"], input[type="number"], input[type="date"], select {
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: #fff; min-width: 0;
+  }
+  input[type="text"] { flex: 1 1 220px; }
+  input[type="number"] { width: 90px; }
+  label.f { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 0.95rem; }
+  label.f > input, label.f > select { color: var(--ink); flex: none; }
+
+  .seg { display: flex; flex-wrap: wrap; gap: 8px; }
+  .seg button { display: inline-flex; align-items: center; gap: 8px; border: 1.5px solid var(--line); border-radius: 999px; background: #fff; padding: 7px 16px 7px 10px; }
+  .seg button::before { content: ""; flex: none; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #9AA8B2; background: #fff; }
+  .seg button[aria-pressed="true"] { border-color: var(--blue); background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+  .seg button[aria-pressed="true"]::before { border: 5px solid var(--blue); }
+  .setup-grid { display: grid; grid-template-columns: max-content 1fr; gap: 12px 16px; align-items: center; margin-bottom: 16px; }
+  .setup-grid > span { color: var(--muted); }
+  @media (max-width: 560px) { .setup-grid { grid-template-columns: 1fr; gap: 4px; } .setup-grid > span { margin-top: 8px; } }
+
+  .student-list { list-style: none; margin: 0; padding: 0; }
+  .student-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+  .student-list li:first-child { border-top: none; }
+  .student-list li.slim { padding: 3px 0; gap: 8px; }
+  .student-list li.slim .slim-text { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; min-width: 0; }
+  .student-list li.slim .student-name { font-size: 1.02rem; }
+  .student-list li.slim .btn { padding: 2px 12px; font-size: 0.88rem; }
+  .student-name { font-weight: 700; font-size: 1.1rem; line-height: 1.3; }
+  .counts { color: var(--muted); font-size: 0.9rem; line-height: 1.3; }
+
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 700; }
+
+  /* letter picker */
+  .pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 8px; margin: 8px 0 14px; }
+  .pick button { height: 74px; border-radius: 10px; border: 2px solid var(--line); background: var(--none-bg); color: #8B99A4; padding: 4px; display: flex; align-items: center; justify-content: center; }
+  .pick button svg { height: 100%; width: auto; max-width: 100%; }
+  .pick.slides { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+  .pick.slides button { height: 86px; }
+  .pick button[aria-pressed="true"] { background: var(--blue-soft); border-color: var(--blue); color: var(--ink); }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; justify-content: center; height: 34px; min-width: 30px; padding: 2px 4px; border-radius: 7px; background: var(--none-bg); color: var(--ink); }
+  .chip svg { height: 100%; width: auto; }
+  .chip.slide { height: 42px; }
+  .chip.err { background: var(--unknown-bg); color: var(--unknown); }
+  .chip .n { font-size: 0.8rem; font-weight: 700; margin-left: 2px; }
+
+  /* decision box */
+  .decision { border-radius: 12px; padding: 16px 18px; margin-bottom: 18px; border: 1px solid; }
+  .decision h3 { margin: 0 0 6px; }
+  .decision p { margin: 0 0 8px; }
+  .decision ul { margin: 4px 0 0; padding-left: 22px; }
+  .decision li { margin-bottom: 3px; }
+  .decision .rule { font-size: 0.85rem; color: var(--muted); margin-top: 8px; }
+  .pill { display: inline-block; font-size: 0.8rem; font-weight: 700; padding: 1px 9px; border-radius: 999px; border: 1px solid; }
+  .pill.go { background: var(--known-bg); color: var(--known); border-color: #B7DCC3; }
+  .pill.keep { background: var(--blue-soft); color: var(--blue); border-color: #B2D9D4; }
+  .pill.change { background: var(--warn-bg); color: #7A5A00; border-color: var(--warn-line); }
+  .pill.stop { background: var(--unknown-bg); color: var(--unknown); border-color: #E3B8BD; }
+  .d-go { background: var(--known-bg); border-color: #B7DCC3; }
+  .d-keep { background: var(--blue-soft); border-color: #B2D9D4; }
+  .d-change { background: var(--warn-bg); border-color: var(--warn-line); }
+  .d-stop { background: var(--unknown-bg); border-color: #E3B8BD; }
+  .stats { display: flex; flex-wrap: wrap; gap: 22px; margin: 4px 0 6px; }
+  .stat { min-width: 110px; }
+  .stat .v { font-size: 2rem; font-weight: 700; line-height: 1.1; }
+  .stat .k { color: var(--muted); font-size: 0.9rem; }
+  .stat.c .v { color: var(--known); }
+  .stat.e .v { color: var(--unknown); }
+
+  /* chart */
+  .chart-wrap { overflow-x: auto; }
+  .chart-wrap svg { display: block; width: 100%; min-width: 640px; height: auto; font-family: var(--font); }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 0.9rem; color: var(--muted); margin-top: 6px; }
+
+  /* timing screen */
+  .run { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; background: var(--bg); }
+  .run-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 18px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  .run-bar .who { font-weight: 700; }
+  .run-bar .meta { color: var(--muted); }
+  .clock { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 80px; text-align: center; padding: 2px 12px; border-radius: 10px; background: var(--blue-soft); color: var(--blue); }
+  .clock.done { background: var(--unknown-bg); color: var(--unknown); }
+  .msg { padding: 10px 18px; text-align: center; font-weight: 700; }
+  .msg.warn { background: var(--warn-bg); border-bottom: 1px solid var(--warn-line); }
+  .stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; gap: 18px; }
+  .sheet { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; width: min(100%, 1000px); }
+  @media (max-width: 700px) { .sheet { grid-template-columns: repeat(5, 1fr); } }
+  .sheet button { background: #fff; border: 2px solid var(--line); border-radius: 12px; height: clamp(58px, calc((100dvh - 320px) / 5), 120px); padding: 6px; color: var(--ink); display: flex; align-items: center; justify-content: center; position: relative; }
+  .sheet button svg { height: 100%; width: auto; max-width: 100%; }
+  .sheet button.err { background: var(--unknown-bg); border-color: var(--unknown); color: var(--unknown); }
+  .sheet button.err::after { content: "✗"; position: absolute; top: 2px; right: 6px; font-size: 0.9rem; font-weight: 700; }
+  /* while the timer runs: quiet = small gray dot only; hidden = no change on the letter */
+  .sheet.m-quiet button.err, .sheet.m-hidden button.err { background: #fff; border-color: var(--line); color: var(--ink); }
+  .sheet.m-quiet button.err::after { content: ""; top: 7px; right: 7px; width: 9px; height: 9px; border-radius: 50%; background: #A9B5BE; }
+  .sheet.m-hidden button.err::after { content: none; }
+  .sheet button { -webkit-tap-highlight-color: transparent; }
+  .sheet button:focus { outline: none; }
+  .sheet button:focus-visible { outline: 3px solid var(--blue); }
+  .markcount { font-size: 0.9rem; color: var(--muted); }
+  .sheet button.past { opacity: 0.25; }
+  .sheet button.last { outline: 4px solid var(--blue); outline-offset: 1px; }
+  .sheet-nav { display: flex; gap: 12px; align-items: center; color: var(--muted); }
+  .card { background: #fff; border-radius: 22px; border: 2px solid var(--line); width: min(88vw, 460px); height: min(75vw, 390px, 46vh); display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 0 var(--line); }
+  .card svg { display: block; height: 90%; width: auto; max-width: 95%; color: var(--ink); }
+  .mark-row { display: flex; gap: 16px; width: min(88vw, 460px); }
+  .mark { flex: 1; border-radius: 14px; padding: 18px 10px; font-size: 1.25rem; font-weight: 700; border: 2px solid; }
+  .mark.no { background: var(--unknown-bg); color: var(--unknown); border-color: #E3B8BD; }
+  .mark.yes { background: var(--known-bg); color: var(--known); border-color: #B7DCC3; }
+  .keys { font-size: 0.85rem; color: var(--muted); text-align: center; }
+  .keys kbd { border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; background: #fff; font-family: inherit; }
+  .ready { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px 24px; max-width: 620px; }
+  .ready ul { padding-left: 22px; margin: 8px 0 16px; }
+
+  .modal-back { position: fixed; inset: 0; background: rgba(30, 43, 55, 0.45); z-index: 50; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .modal { background: var(--panel); border-radius: 14px; padding: 20px 22px; width: min(440px, 100%); box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+  .modal p { margin: 0 0 14px; }
+  .modal input { width: 100%; margin-bottom: 14px; }
+  .modal .row { justify-content: flex-end; }
+  details summary { cursor: pointer; font-weight: 700; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function () {
+  // ---------- ball-and-stick letters (same shapes as the Letter Names and Sounds app) ----------
+  // Units: top line y=0, midline y=50, baseline y=100, descender y=150. t is straight; q has a curl.
+  const O = (cx) => `M${cx + 25},75 A25,25 0 1 0 ${cx - 25},75 A25,25 0 1 0 ${cx + 25},75`;
+  const GLYPHS = {
+    a: { c: 25, x: [0, 50], d: O(25) + " M50,50 L50,100" },
+    b: { c: 25, x: [0, 50], d: "M0,0 L0,100 " + O(25) },
+    c: { c: 21, x: [0, 43], d: "M42.7,57.3 A25,25 0 1 0 42.7,92.7" },
+    d: { c: 25, x: [0, 50], d: O(25) + " M50,0 L50,100" },
+    e: { c: 25, x: [0, 50], d: "M0,75 L50,75 A25,25 0 1 0 42.7,92.7" },
+    f: { c: 21, x: [0, 43], d: "M15,100 L15,22 A18,18 0 0 1 43,8 M0,50 L34,50" },
+    g: { c: 25, x: [0, 50], d: O(25) + " M50,50 L50,130 A18,18 0 0 1 14,130" },
+    h: { c: 25, x: [0, 50], d: "M0,0 L0,100 M0,75 A25,25 0 0 1 50,75 L50,100" },
+    i: { c: 0, x: [0, 0], d: "M0,50 L0,100", dots: [[0, 28]] },
+    j: { c: 8, x: [-11, 25], d: "M25,50 L25,130 A18,18 0 0 1 -11,130", dots: [[25, 28]] },
+    k: { c: 20, x: [0, 42], d: "M0,0 L0,100 M40,50 L0,76 L42,100" },
+    l: { c: 0, x: [0, 0], d: "M0,0 L0,100" },
+    m: { c: 40, x: [0, 80], d: "M0,50 L0,100 M0,70 A20,20 0 0 1 40,70 L40,100 M40,70 A20,20 0 0 1 80,70 L80,100" },
+    n: { c: 25, x: [0, 50], d: "M0,50 L0,100 M0,75 A25,25 0 0 1 50,75 L50,100" },
+    o: { c: 25, x: [0, 50], d: O(25) },
+    p: { c: 25, x: [0, 50], d: "M0,50 L0,150 " + O(25) },
+    q: { c: 32, x: [0, 78], d: O(25) + " M50,50 L50,132 A14,14 0 0 0 78,132" },
+    r: { c: 20, x: [0, 40], d: "M0,50 L0,100 M0,74 A24,24 0 0 1 40,56" },
+    s: { c: 23, x: [2, 44], d: "M44,58 C39,49 6,48 6,63 C6,78 44,72 44,88 C44,104 8,103 2,93" },
+    t: { c: 15, x: [0, 30], d: "M15,12 L15,100 M0,50 L30,50" },
+    u: { c: 25, x: [0, 50], d: "M0,50 L0,75 A25,25 0 0 0 50,75 M50,50 L50,100" },
+    v: { c: 25, x: [0, 50], d: "M0,50 L25,100 L50,50" },
+    w: { c: 36, x: [0, 72], d: "M0,50 L18,100 L36,50 L54,100 L72,50" },
+    x: { c: 23, x: [0, 46], d: "M0,50 L46,100 M46,50 L0,100" },
+    y: { c: 25, x: [0, 50], d: "M0,50 L25,100 M50,50 L12,150" },
+    z: { c: 23, x: [0, 46], d: "M0,50 L46,50 L0,100 L46,100" },
+  };
+  const STROKE = 10, VB_W = 130, VB_TOP = -12, VB_H = 174, GAP = 26;
+  function glyphParts(g, dx) {
+    const dots = (g.dots || []).map(([x, y]) => `<circle cx="${x + dx}" cy="${y}" r="7" fill="currentColor"/>`).join("");
+    return `<path transform="translate(${dx},0)" d="${g.d}" fill="none" stroke="currentColor" stroke-width="${STROKE}" stroke-linecap="round" stroke-linejoin="round"/>${dots}`;
+  }
+  // Layout for one item. A slide (consonant + vowel read together) gets an arrow under the letters pointing right.
+  const ARROW_Y = 180, SLIDE_EXTRA = 38;
+  function glyphLayout(item, arrow) {
+    const chars = String(item).split("").filter((ch) => GLYPHS[ch]);
+    const offsets = [];
+    let minX, vbW, end = 0;
+    if (chars.length === 1 && !arrow) { const g = GLYPHS[chars[0]]; minX = g.c - VB_W / 2; vbW = VB_W; offsets.push(0); }
+    else {
+      let x = 0;
+      chars.forEach((ch, i) => { const g = GLYPHS[ch]; const dx = x - g.x[0]; offsets.push(dx); x = dx + g.x[1] + (i < chars.length - 1 ? GAP : 0); });
+      end = x; minX = -22; vbW = x + 44;
+    }
+    let a = null;
+    if (arrow) {
+      a = { x0: -6, x1: end + 6 };
+      const MIN = 84;
+      if (a.x1 - a.x0 < MIN) { const mid = (a.x0 + a.x1) / 2; a = { x0: mid - MIN / 2, x1: mid + MIN / 2 }; }
+      const right = Math.max(minX + vbW, a.x1 + 12);
+      minX = Math.min(minX, a.x0 - 12); vbW = right - minX;
+    }
+    return { chars, offsets, minX, vbW, vbH: VB_H + (arrow ? SLIDE_EXTRA : 0), arrow: a };
+  }
+  const arrowPath = (a) => `M${a.x0},${ARROW_Y} L${a.x1},${ARROW_Y} M${a.x1 - 15},${ARROW_Y - 12} L${a.x1},${ARROW_Y} L${a.x1 - 15},${ARROW_Y + 12}`;
+  function glyphSVG(item, arrow) {
+    const L = glyphLayout(item, arrow);
+    const out = L.chars.map((ch, i) => glyphParts(GLYPHS[ch], L.offsets[i])).join("");
+    const arr = L.arrow ? `<path d="${arrowPath(L.arrow)}" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>` : "";
+    return `<svg viewBox="${L.minX} ${VB_TOP} ${L.vbW} ${L.vbH}" aria-hidden="true">${out}${arr}</svg>`;
+  }
+
+  const LETTERS = "abcdefghijklmnopqrstuvwxyz".split("");
+  const DIGRAPHS = ["sh", "ch", "th", "wh", "ck"];
+  const BAK1 = ["b", "m", "s", "r", "t", "n", "g", "i", "p", "a", "h", "l", "c", "f", "d"];
+  const VOWELS = ["a", "e", "i", "o", "u"];
+  const KEY = "ptLetterSoundChart.v1";
+  const DEFAULT_AIM = 60, DEFAULT_ERR = 2;
+  const DEFAULTS = { seconds: 60, minCel: 1.25, range: "close", mode: "sheet", probeGrade: "K", lastBackup: 0, sameDay: "best", showClues: true, sprintSeconds: 15, markStyle: "hidden" };
+  // Sunform picture clue names, shown next to missed letters for error correction (no clue for x)
+  const CLUES = { a: "apple", b: "bat and ball", c: "cat", d: "dog", e: "echoing explorer", f: "funny fish", g: "goofy glasses", h: "highchair",
+    i: "inchworm", j: "jumper", k: "kicker", l: "long legs", m: "mountain man", n: "newt", o: "octopus", p: "plumbing pipe", q: "queen",
+    r: "railroad", s: "snake", t: "tall tower", u: "upside down umbrella", v: "v-neck vest", w: "wild wave", y: "yellow yarn", z: "zig zag" };
+  const clueFor = (k) => data.settings.showClues !== false && CLUES[k] ? CLUES[k] : "";
+  const withClue = (k) => clueFor(k) ? `${k} (${clueFor(k)})` : k;
+  const PROBE_GRADES = {
+    K: { label: "Kindergarten (largest letters, 5 per row)", short: "Kindergarten", cols: 5, rows: 6 },
+    "1": { label: "1st grade (6 per row)", short: "1st grade", cols: 6, rows: 8 },
+    "2": { label: "2nd grade (8 per row)", short: "2nd grade", cols: 8, rows: 10 },
+  };
+
+  let data = { students: [], sets: [], settings: Object.assign({}, DEFAULTS) };
+  let view = { name: "home" };
+  let run = null;          // the timing in progress
+  let draft = null;        // letter set being made or edited
+  let pending = null;      // finished timing waiting to be saved
+  const ui = { chartSet: {}, startSet: {}, showManual: false, sprints: {}, todaySort: "need" };
+
+  // ---------- helpers ----------
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const $ = (id) => document.getElementById(id);
+  const getStudent = (id) => data.students.find((s) => s.id === id);
+  const getSet = (id) => data.sets.find((s) => s.id === id);
+  const sortedStudents = () => data.students.slice().sort((a, b) => a.name.localeCompare(b.name));
+  const sortedSets = () => data.sets.slice().sort((a, b) => a.name.localeCompare(b.name));
+  function todayStr() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  const dayNum = (s) => { const [y, m, d] = s.split("-").map(Number); return Math.round(Date.UTC(y, m - 1, d) / 86400000); };
+  const dayToDate = (n) => new Date(n * 86400000);
+  const fmtDate = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }); };
+  const fmtShort = (n) => dayToDate(n).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+  const r1 = (n) => (Math.round(n * 10) / 10).toString();
+  const perMin = (count, seconds) => count * 60 / seconds;
+  const fmtLen = (sec) => sec === 60 ? "1 minute" : sec < 60 ? `${sec} seconds` : `${r1(sec / 60)} minutes`;
+  function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+  function sequence(items, n, prev) {
+    // shuffled rounds of the set, never the same letter twice in a row
+    const out = [];
+    let last = prev;
+    while (out.length < n) {
+      const bag = shuffle(items.slice());
+      if (bag.length > 1 && bag[0] === last) { const k = 1 + Math.floor(Math.random() * (bag.length - 1)); [bag[0], bag[k]] = [bag[k], bag[0]]; }
+      bag.forEach((x) => out.push(x));
+      last = out[out.length - 1];
+    }
+    return out.slice(0, n);
+  }
+  const itemSort = (a, b) => (a.length - b.length) || a.localeCompare(b);
+  const isSlides = (set) => !!(set && set.kind === "slides");
+  const chips = (items, cls, arrow) => `<div class="chip-row">${items.map((x) => `<span class="chip ${cls || ""}${arrow ? " slide" : ""}" title="${esc(x)}">${glyphSVG(x, arrow)}</span>`).join("")}</div>`;
+  const sessionsFor = (st, setId) => st.sessions.filter((x) => x.setId === setId).sort((a, b) => a.date.localeCompare(b.date) || (a.at || 0) - (b.at || 0));
+  const phasesFor = (st, setId) => (st.phases || []).filter((p) => p.setId === setId).sort((a, b) => a.date.localeCompare(b.date));
+
+  // ---------- pop-ups (the browser's own confirm/prompt are blocked inside Claude) ----------
+  function modal({ message, ok = "OK", cancel = "Cancel", input = null, danger = false }) {
+    return new Promise((resolve) => {
+      const back = document.createElement("div");
+      back.className = "modal-back"; back.id = "modal";
+      back.innerHTML = `<div class="modal" role="dialog" aria-modal="true"><p>${esc(message)}</p>
+        ${input !== null ? `<input type="text" id="modalInput" value="${esc(input)}" autocomplete="off">` : ""}
+        <div class="row">${cancel ? `<button class="btn" id="modalCancel">${esc(cancel)}</button>` : ""}
+        <button class="btn ${danger ? "danger" : "primary"}" id="modalOk">${esc(ok)}</button></div></div>`;
+      document.body.appendChild(back);
+      const inp = back.querySelector("#modalInput");
+      const done = (v) => { back.remove(); document.removeEventListener("keydown", onKey, true); resolve(v); };
+      const okVal = () => inp ? inp.value : true, cancelVal = inp ? null : false;
+      const onKey = (e) => {
+        if (e.key === "Escape" && cancel) { e.preventDefault(); e.stopPropagation(); done(cancelVal); }
+        else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); done(okVal()); }
+      };
+      document.addEventListener("keydown", onKey, true);
+      back.querySelector("#modalOk").onclick = () => done(okVal());
+      if (cancel) back.querySelector("#modalCancel").onclick = () => done(cancelVal);
+      (inp || back.querySelector("#modalOk")).focus();
+      if (inp) inp.select();
+    });
+  }
+  const ask = (message, ok, danger) => modal({ message, ok, danger });
+  const askText = (message, value, ok) => modal({ message, input: value || "", ok: ok || "Save" });
+  const tell = (message) => modal({ message, cancel: null });
+
+  // ---------- storage: Claude account when available, otherwise this browser ----------
+  let mode = "local", loading = false, remoteDb = null, remoteUid = null, downloadsCap = null;
+  let savedCache = {}, saveError = false, saveChain = Promise.resolve(), noAccessNote = false;
+
+  function normalize(d) {
+    const out = { students: [], sets: [], settings: Object.assign({}, DEFAULTS) };
+    if (d && typeof d === "object") {
+      if (Array.isArray(d.students)) out.students = d.students.filter((s) => s && typeof s.name === "string");
+      if (Array.isArray(d.sets)) out.sets = d.sets.filter((s) => s && typeof s.name === "string" && Array.isArray(s.items));
+      if (d.settings && typeof d.settings === "object") Object.assign(out.settings, d.settings);
+    }
+    out.students.forEach((s) => { if (!s.id) s.id = uid(); if (!Array.isArray(s.sessions)) s.sessions = []; if (!Array.isArray(s.phases)) s.phases = []; });
+    out.sets.forEach((s) => { if (!s.id) s.id = uid(); if (!(s.aim > 0)) s.aim = DEFAULT_AIM; if (!(s.errMax >= 0)) s.errMax = DEFAULT_ERR; });
+    return out;
+  }
+  function loadLocal() {
+    try { const raw = localStorage.getItem(KEY); if (raw) data = normalize(JSON.parse(raw)); }
+    catch (e) { console.error("Could not load saved data", e); }
+  }
+  // Remote layout: one doc per student ("s_<id>") and one "config" doc for letter sets and settings.
+  function remoteDocs() {
+    const docs = { config: JSON.stringify({ kind: "config", sets: data.sets, settings: data.settings }) };
+    data.students.forEach((s) => (docs["s_" + s.id] = JSON.stringify(Object.assign({ kind: "student" }, s))));
+    return docs;
+  }
+  async function init() {
+    if (window.claude && typeof window.claude.use === "function") {
+      loading = true; render();
+      try {
+        const [dbCap, userCap, dl] = await Promise.all([window.claude.use("db"), window.claude.use("user"), window.claude.use("downloads")]);
+        downloadsCap = dl;
+        const id = userCap ? await userCap.id() : null;
+        const canWrite = userCap ? await userCap.can("data.write") : null;
+        if (dbCap && id && canWrite === false) { noAccessNote = true; loadLocal(); }
+        else if (dbCap && id) {
+          const snap = await dbCap.collection("data/users/" + id).get();
+          remoteDb = dbCap; remoteUid = id; mode = "claude";
+          const raw = { students: [], sets: [], settings: {} };
+          snap.docs.filter((d) => d.exists).forEach((d) => {
+            const v = JSON.parse(JSON.stringify(d.data()));
+            if (v.kind === "config") { raw.sets = v.sets || []; raw.settings = v.settings || {}; }
+            else if (v.kind === "student") { delete v.kind; raw.students.push(v); }
+          });
+          data = normalize(raw);
+          savedCache = remoteDocs();
+          if (!snap.docs.length) {
+            // first visit in Claude: bring in anything saved in this browser
+            try { const loc = localStorage.getItem(KEY); if (loc) { data = normalize(JSON.parse(loc)); save(); } } catch (e) { /* nothing */ }
+          }
+        } else loadLocal();
+      } catch (e) { console.error("Could not load from Claude", e); loadLocal(); }
+      loading = false; render();
+    } else { loadLocal(); render(); }
+  }
+  function save() {
+    if (mode === "local") {
+      try { localStorage.setItem(KEY, JSON.stringify(data)); }
+      catch (e) { tell("Results could not be saved in this browser. Make a backup on the Backup page."); }
+      return;
+    }
+    saveChain = saveChain.then(syncRemote);
+  }
+  async function syncRemote() {
+    if (mode !== "claude") return;
+    const col = remoteDb.collection("data/users/" + remoteUid);
+    const cur = remoteDocs();
+    let failed = false;
+    for (const k of Object.keys(cur)) {
+      if (cur[k] === savedCache[k]) continue;
+      try { await col.doc(k).set(JSON.parse(cur[k])); savedCache[k] = cur[k]; }
+      catch (e) {
+        console.error(e);
+        if (e && e.code === "invalid_argument") { mode = "local"; noAccessNote = true; try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (x) { /* */ } render(); return; }
+        failed = true;
+      }
+    }
+    for (const k of Object.keys(savedCache)) {
+      if (k in cur) continue;
+      try { await col.doc(k).delete(); delete savedCache[k]; } catch (e) { console.error(e); failed = true; }
+    }
+    if (failed !== saveError) { saveError = failed; render(); }
+  }
+  async function download(filename, text, mime) {
+    if (downloadsCap) {
+      try { await downloadsCap.save({ filename, data: new Blob([text], { type: mime }) }); return true; }
+      catch (e) { if (!(e && e.code === "declined")) tell("The file could not be downloaded here."); return false; }
+    }
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: mime }));
+    a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    return true;
+  }
+
+  // ---------- backups ----------
+  const inClaude = () => !!(window.claude && typeof window.claude.use === "function");
+  let driveStatus = null;
+  function backupJSON() { return JSON.stringify(data, null, 2); }
+  function markBackedUp() { data.settings.lastBackup = Date.now(); save(); }
+  async function backupDownload() {
+    const ok = await download(`celeration-station-backup-${todayStr()}.json`, backupJSON(), "application/json");
+    if (ok) { markBackedUp(); render(); }
+  }
+  async function backupToDrive(btn) {
+    const label = btn.textContent;
+    btn.disabled = true; btn.textContent = "Saving to Google Drive…";
+    driveStatus = null;
+    const time = new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+    const title = `Celeration Station backup ${todayStr()} ${time}.json`;
+    try {
+      const mcp = await window.claude.use("mcp");
+      if (!mcp) { driveStatus = { ok: false, msg: "Google Drive backup isn't available in this view. Use Download backup instead." }; return; }
+      const res = await mcp.callTool("Google Drive", "create_file", {
+        title, contentMimeType: "application/json", disableConversionToGoogleType: true, textContent: backupJSON(),
+      }, { cache: false });
+      const p = res && res.payload && typeof res.payload === "object" ? res.payload : {};
+      const url = typeof p.viewUrl === "string" && /^https:\/\/drive\.google\.com\//.test(p.viewUrl) ? p.viewUrl : null;
+      driveStatus = { ok: true, title: typeof p.title === "string" ? p.title : title, url };
+      markBackedUp();
+    } catch (e) {
+      const msgs = {
+        needs_reauth: "Google Drive needs to be reconnected. Reconnect it in claude.ai Settings, Connectors, then try again.",
+        server_not_connected: "Google Drive isn't connected to your Claude account. Add it in claude.ai Settings, Connectors, then try again.",
+        selection_required: "Claude needs you to choose which Google Drive connection to use. Follow the prompt from Claude, then try again.",
+        approval_required: "Saving to Google Drive needs your approval. Press the button again and choose Allow when Claude asks.",
+        not_in_manifest: "Google Drive is turned off for this app. Turn it on in this app's permissions, then try again.",
+        blocked_by_policy: "Your organization's settings don't allow this app to save to Google Drive. Use Download backup instead.",
+        server_unavailable: "Google Drive didn't answer. The backup may or may not have been saved, so check your Google Drive before trying again.",
+        upstream_error: "Something went wrong reaching Google Drive. The backup may or may not have been saved, so check your Google Drive before trying again.",
+        tool_error: "Google Drive reported a problem and the backup was not saved. Try again, or use Download backup.",
+      };
+      driveStatus = { ok: false, msg: msgs[e && e.code] || "The backup could not be saved to Google Drive. Use Download backup instead." };
+    } finally { btn.disabled = false; btn.textContent = label; render(); }
+  }
+  function backupDue() {
+    const times = data.students.flatMap((s) => s.sessions.map((x) => x.at || dayNum(x.date) * 86400000));
+    if (!times.length) return false;
+    const last = data.settings.lastBackup || 0;
+    if (Math.max(...times) <= last) return false;
+    return Date.now() - Math.max(last, Math.min(...times)) >= 7 * 86400000;
+  }
+
+  // ---------- paper probe (PDF) ----------
+  const glyphCache = {};
+  function glyphImage(item, arrow) {
+    const key = item + (arrow ? ">" : "");
+    if (glyphCache[key]) return glyphCache[key];
+    const L = glyphLayout(item, arrow);
+    const H = 420 * L.vbH / VB_H, k = 420 / VB_H, W = Math.ceil(L.vbW * k);
+    const c = document.createElement("canvas"); c.width = W; c.height = Math.ceil(H);
+    const ctx = c.getContext("2d");
+    ctx.scale(k, k); ctx.translate(-L.minX, -VB_TOP);
+    ctx.strokeStyle = "#000"; ctx.fillStyle = "#000"; ctx.lineWidth = STROKE; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    L.chars.forEach((ch, i) => {
+      const g = GLYPHS[ch];
+      ctx.save(); ctx.translate(L.offsets[i], 0); ctx.stroke(new Path2D(g.d)); ctx.restore();
+      (g.dots || []).forEach(([dx, dy]) => { ctx.beginPath(); ctx.arc(dx + L.offsets[i], dy, 7, 0, Math.PI * 2); ctx.fill(); });
+    });
+    if (L.arrow) { ctx.lineWidth = 8; ctx.stroke(new Path2D(arrowPath(L.arrow))); }
+    glyphCache[key] = { src: c.toDataURL("image/png"), ratio: W / c.height };
+    return glyphCache[key];
+  }
+  async function probePdf(set, gradeKey, studentName) {
+    if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("jsPDF not loaded");
+    const G0 = PROBE_GRADES[gradeKey] || PROBE_GRADES.K;
+    const slide = isSlides(set);
+    const G = slide ? { cols: G0.cols - 1, rows: G0.rows } : G0;   // slides are wider, so one fewer per row
+    const doc = new window.jspdf.jsPDF({ unit: "in", format: "letter", orientation: "portrait" });
+    const M = 0.5, PW = 7.5, perPage = G.cols * G.rows;
+    // enough letters that a student working at the aim for 1 minute won't run out
+    const need = Math.max(60, Math.ceil(set.aim * 1.5));
+    const pages = Math.max(1, Math.ceil(need / perPage));
+    const items = sequence(set.items, pages * perPage);
+    const made = new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+    const nameLine = studentName || "";
+
+    // student copy
+    const top = 1.05, bottom = 10.4, cellW = PW / G.cols, cellH = (bottom - top) / G.rows;
+    for (let pg = 0; pg < pages; pg++) {
+      if (pg > 0) doc.addPage();
+      doc.setFont("helvetica", "normal"); doc.setFontSize(12); doc.setTextColor(0);
+      doc.text("Name:", M, M + 0.2);
+      if (nameLine) doc.text(nameLine, M + 0.62, M + 0.2);
+      doc.setDrawColor(120); doc.setLineWidth(0.01);
+      doc.line(M + 0.6, M + 0.25, M + 4.2, M + 0.25);
+      doc.text("Date:", M + 4.6, M + 0.2); doc.line(M + 5.1, M + 0.25, M + PW, M + 0.25);
+      doc.setFontSize(9); doc.setTextColor(110);
+      doc.text(`${set.name}. Page ${pg + 1} of ${pages}.`, M, M + 0.5);
+      for (let r = 0; r < G.rows; r++) {
+        const y = top + r * cellH;
+        if (r > 0) { doc.setDrawColor(215); doc.line(M, y, M + PW, y); }
+        for (let cI = 0; cI < G.cols; cI++) {
+          const item = items[pg * perPage + r * G.cols + cI];
+          const img = glyphImage(item, slide);
+          let h = cellH * 0.86, w = h * img.ratio;
+          if (w > cellW * 0.92) { w = cellW * 0.92; h = w / img.ratio; }
+          doc.addImage(img.src, "PNG", M + cI * cellW + (cellW - w) / 2, y + (cellH - h) / 2, w, h);
+        }
+      }
+    }
+
+    // teacher copy: same letters in the same rows, with running counts
+    doc.addPage();
+    let y = M;
+    const header = () => {
+      doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(0);
+      doc.text("Teacher scoring copy", M, y + 0.2);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+      doc.text(`Student: ${nameLine || "________________________"}    Set: ${set.name}    Date: __________`, M, y + 0.5);
+      doc.text("Timing:  1 minute  /  30 seconds        Correct: ______    Errors: ______", M, y + 0.75);
+      doc.setFontSize(8.5); doc.setTextColor(90);
+      doc.text(`Slash each error. Bracket the last ${slide ? "slide" : "letter"} answered. The number at the end of each row is the total ${slide ? "slides" : "letters"} through that row.`, M, y + 0.98);
+      y += 1.2;
+    };
+    header();
+    const rowH = 0.34, colW = (PW - 0.7) / G.cols;
+    const totalRows = pages * G.rows;
+    for (let r = 0; r < totalRows; r++) {
+      if (y + rowH > 10.5) { doc.addPage(); y = M; header(); }
+      if (r % G.rows === 0) {
+        doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(90);
+        doc.text(`Student page ${r / G.rows + 1}`, M, y + 0.14); y += 0.22;
+      }
+      doc.setFont("courier", "normal"); doc.setFontSize(15); doc.setTextColor(0);
+      for (let cI = 0; cI < G.cols; cI++) doc.text(items[r * G.cols + cI], M + cI * colW + 0.1, y + 0.24);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(90);
+      doc.text(String((r + 1) * G.cols), M + PW, y + 0.24, { align: "right" });
+      doc.setDrawColor(225); doc.line(M, y + rowH, M + PW, y + rowH);
+      y += rowH;
+    }
+    doc.setFontSize(8); doc.setTextColor(130);
+    doc.text(`Made ${made} with Celeration Station. After the timing, enter the score with "Enter a timing done on paper."`, M, 10.7);
+    const fname = `${(studentName ? studentName + "-" : "") + set.name}`.replace(/[^A-Za-z0-9 _-]/g, "").trim().replace(/\s+/g, "-") || "probe";
+    await download(`${fname}-probe-${todayStr()}.pdf`, doc.output("blob"), "application/pdf");
+  }
+  async function svgToPng(svg) {
+    const m = svg.match(/viewBox="0 0 (\d+) (\d+)"/);
+    const W = +m[1], H = +m[2], scale = 2.4;
+    const img = new Image();
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+    await img.decode();
+    const c = document.createElement("canvas"); c.width = W * scale; c.height = H * scale;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    return { src: c.toDataURL("image/png"), ratio: W / H };
+  }
+  async function chartPdf(st, set) {
+    if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("jsPDF not loaded");
+    const doc = new window.jspdf.jsPDF({ unit: "in", format: "letter", orientation: "landscape" });
+    const M = 0.5, PW = 10, BOTTOM = 8.0;
+    let y = M;
+    const text = (str, size, style, gap, color) => {
+      doc.setFont("helvetica", style || "normal"); doc.setFontSize(size); doc.setTextColor(color || 0);
+      const lh = size / 72 * 1.3;
+      doc.splitTextToSize(str, PW).forEach((ln) => { if (y + lh > BOTTOM) { doc.addPage(); y = M; } doc.text(ln, M, y + lh * 0.8); y += lh; });
+      y += gap || 0;
+    };
+    const d = decide(st, set);
+    const list = sessionsFor(st, set.id), counted = new Set(charted(list));
+    const made = new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+    text(`${st.name}: ${set.name}`, 16, "bold", 0.02);
+    text(`${st.grade ? GRADE_NAMES[st.grade] + ". " : ""}${isSlides(set) ? "Slides" : "Letter sounds"}: ${set.items.join(" ")}. Aim: ${set.aim} correct per minute with ${set.errMax} or fewer errors.${d.cel ? ` Celeration this phase: correct ${celText(d.cel.value)}${d.errCel ? `, errors ${celText(d.errCel.value)}` : ""} per week.` : ""} Printed ${made}.`, 9.5, "normal", 0.08, 70);
+    text(`Next step: ${d.title}`, 11, "bold", 0.02);
+    if (d.text) text(d.text, 9.5, "normal", 0.06);
+    const img = await svgToPng(chartSVG(st, set));
+    const w = PW, h = w / img.ratio;
+    const room = BOTTOM - y - 0.25;
+    const hh = Math.min(h, room), ww = hh * img.ratio;
+    doc.addImage(img.src, "PNG", M + (PW - ww) / 2, y, ww, hh);
+    y += hh + 0.06;
+    text("Dots: correct per minute. X: errors per minute. Dashed vertical lines: phase changes. Short black dashes: record floor (1 per timing).", 8, "normal", 0, 110);
+
+    // page 2: timings and phase notes
+    doc.addPage(); y = M;
+    text(`Timings: ${st.name}, ${set.name}`, 14, "bold", 0.1);
+    const cols = [["Date", 1.3], ["Length", 0.9], ["Correct", 0.8], ["Errors", 0.8], ["Correct/min", 1.0], ["Errors/min", 0.9], ["Accuracy", 0.8], ["Error letters", 3.5]];
+    const rowH = 0.24;
+    const row = (cells, head, faint) => {
+      if (y + rowH > BOTTOM) { doc.addPage(); y = M; row(cols.map((c) => c[0]), true); }
+      if (head) { doc.setFillColor(235); doc.rect(M, y, PW, rowH, "F"); }
+      doc.setFont("helvetica", head ? "bold" : "normal"); doc.setFontSize(9); doc.setTextColor(faint ? 140 : 0);
+      let x = M;
+      cells.forEach((t, i) => { doc.text(doc.splitTextToSize(String(t), cols[i][1] - 0.08)[0] || "", x + 0.05, y + rowH / 2, { baseline: "middle" }); x += cols[i][1]; });
+      doc.setDrawColor(210); doc.setLineWidth(0.01); doc.line(M, y + rowH, M + PW, y + rowH);
+      y += rowH;
+    };
+    row(cols.map((c) => c[0]), true);
+    list.forEach((s) => row([
+      fmtDate(s.date) + (counted.has(s) ? "" : " *"), fmtLen(s.seconds), s.correct, s.errors,
+      r1(perMin(s.correct, s.seconds)), r1(perMin(s.errors, s.seconds)),
+      s.correct + s.errors ? Math.round(100 * s.correct / (s.correct + s.errors)) + "%" : "",
+      Object.entries(s.errorItems || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => k + (v > 1 ? ` x${v}` : "")).join(", ") || (s.manual ? "paper timing" : "none"),
+    ], false, !counted.has(s)));
+    if (list.some((s) => !counted.has(s))) { y += 0.06; text(`* Not counted: another timing that day counts (${data.settings.sameDay === "first" ? "first" : "best"} timing of the day).`, 8.5, "normal", 0, 110); }
+    const phases = phasesFor(st, set.id);
+    y += 0.2;
+    text("Phase changes", 12, "bold", 0.04);
+    if (phases.length) phases.forEach((p) => text(`${fmtDate(p.date)}: ${p.note || "Phase change"}`, 10, "normal", 0));
+    else text("None.", 10, "normal", 0);
+    if (d.missedList.length) { y += 0.15; text("Missed in the current phase", 12, "bold", 0.04); text(d.missedList.slice(0, 15).map((k) => `${withClue(k)}: ${d.missed[k]}`).join("; "), 10, "normal", 0); }
+    const fname = `${st.name}-${set.name}-chart`.replace(/[^A-Za-z0-9 _-]/g, "").trim().replace(/\s+/g, "-");
+    await download(`${fname}-${todayStr()}.pdf`, doc.output("blob"), "application/pdf");
+  }
+  async function busy(btn, fn) {
+    const label = btn.textContent;
+    btn.disabled = true; btn.textContent = "Making PDF…";
+    try { await fn(); }
+    catch (e) { console.error(e); tell("The PDF could not be made. Check your internet connection and try again."); }
+    finally { btn.disabled = false; btn.textContent = label; }
+  }
+  async function printProbe(btn, set, gradeKey, studentName) {
+    const label = btn.textContent;
+    btn.disabled = true; btn.textContent = "Making PDF…";
+    try { await probePdf(set, gradeKey, studentName); }
+    catch (e) { console.error(e); tell("The PDF could not be made. Check your internet connection and try again."); }
+    finally { btn.disabled = false; btn.textContent = label; }
+  }
+  const gradeSelect = (id, value) => `<select id="${id}" aria-label="Grade level for the paper probe">${Object.entries(PROBE_GRADES).map(([k, g]) => `<option value="${k}" ${String(value || data.settings.probeGrade) === k ? "selected" : ""}>${g.label}</option>`).join("")}</select>`;
+  const GRADE_NAMES = { K: "Kindergarten", "1": "1st grade", "2": "2nd grade" };
+
+  // ---------- celeration math ----------
+  function fitLine(pts) {
+    const n = pts.length; if (n < 2) return null;
+    const mx = pts.reduce((s, p) => s + p.x, 0) / n, my = pts.reduce((s, p) => s + p.y, 0) / n;
+    let sxx = 0, sxy = 0;
+    pts.forEach((p) => { sxx += (p.x - mx) ** 2; sxy += (p.x - mx) * (p.y - my); });
+    if (sxx === 0) return null;
+    const b = sxy / sxx;
+    return { a: my - b * mx, b };
+  }
+  // log10 of a rate; zero counts are placed below the record floor (half of 1 per timing)
+  const logRate = (count, seconds) => Math.log10(count > 0 ? perMin(count, seconds) : perMin(0.5, seconds));
+  function celeration(sessions, key) {
+    const pts = sessions.map((s) => ({ x: dayNum(s.date), y: logRate(s[key], s.seconds) }));
+    const f = fitLine(pts);
+    if (!f) return null;
+    return { fit: f, x0: pts[0].x, x1: pts[pts.length - 1].x, value: Math.pow(10, f.b * 7) };
+  }
+  const celText = (v) => v >= 1 ? `×${v.toFixed(2)}` : `÷${(1 / v).toFixed(2)}`;
+  const MIN_POINTS = 5, MIN_DAYS = 7, CEL_WINDOW = 10;
+
+  // When there is more than one timing on a day, which one counts (Settings).
+  function charted(list) {
+    const rule = data.settings.sameDay || "best";
+    if (rule === "all") return list.slice();
+    const byDay = {};
+    list.forEach((x) => {
+      const cur = byDay[x.date];
+      if (!cur) { byDay[x.date] = x; return; }
+      if (rule === "best") {
+        const a = perMin(x.correct, x.seconds), b = perMin(cur.correct, cur.seconds);
+        if (a > b || (a === b && perMin(x.errors, x.seconds) < perMin(cur.errors, cur.seconds))) byDay[x.date] = x;
+      }
+    });
+    return list.filter((x) => byDay[x.date] === x);
+  }
+  const chartedFor = (st, setId) => charted(sessionsFor(st, setId));
+
+  // Retention: after the aim is met on 2 days in a row, the first timing 7+ days later is the retention check.
+  const RET_DAYS = 7, RET_LATE = 14, RET_HOLD = 0.9;
+  const addDays = (date, n) => { const d = dayToDate(dayNum(date) + n); return d.toISOString().slice(0, 10); };
+  function retentionInfo(st, set) {
+    const list = chartedFor(st, set.id);
+    const met = (x) => perMin(x.correct, x.seconds) >= set.aim && perMin(x.errors, x.seconds) <= set.errMax;
+    let info = { status: "none" }, i = 1;
+    while (i < list.length) {
+      if (met(list[i]) && met(list[i - 1]) && list[i].date !== list[i - 1].date) {
+        const aimDate = list[i].date, dueDate = addDays(aimDate, RET_DAYS);
+        const check = list.slice(i + 1).find((x) => x.date >= dueDate);
+        if (!check) return { status: "due", aimDate, dueDate, lateDate: addDays(aimDate, RET_LATE), set, st };
+        const held = perMin(check.correct, check.seconds) >= RET_HOLD * set.aim && perMin(check.errors, check.seconds) <= set.errMax;
+        if (held) return { status: "retained", aimDate, dueDate, check, set, st };
+        info = { status: "lost", aimDate, dueDate, check, set, st };
+        i = list.indexOf(check) + 2;   // look for the aim to be met again after the check
+        continue;
+      }
+      i++;
+    }
+    return info;
+  }
+
+  function currentPhase(st, setId) {
+    const all = chartedFor(st, setId);
+    const phases = phasesFor(st, setId);
+    const start = phases.length ? phases[phases.length - 1].date : null;
+    return { all, phase: start ? all.filter((s) => s.date >= start) : all, phaseStart: start, phaseNote: phases.length ? phases[phases.length - 1].note : "" };
+  }
+
+  // ---------- decision rules ----------
+  function decide(st, set) {
+    const minCel = Number(data.settings.minCel) || 1.25;
+    const { all, phase } = currentPhase(st, set.id);
+    const n = phase.length;
+    const cRate = (s) => perMin(s.correct, s.seconds), eRate = (s) => perMin(s.errors, s.seconds);
+    const acc = (s) => (s.correct + s.errors) ? s.correct / (s.correct + s.errors) : 0;
+    const metAim = (s) => cRate(s) >= set.aim && eRate(s) <= set.errMax;
+    const missed = {};
+    phase.forEach((s) => Object.entries(s.errorItems || {}).forEach(([k, v]) => (missed[k] = (missed[k] || 0) + v)));
+    const missedList = Object.keys(missed).sort((a, b) => missed[b] - missed[a] || itemSort(a, b));
+    const out = { missed, missedList, n, cel: null, errCel: null };
+
+    if (!all.length) return Object.assign(out, { tone: "keep", title: "Take a first timing",
+      text: `No timings yet for ${set.name}. The first timing shows where ${st.name} is starting.`,
+      bullets: ["Do a short warm-up with the letters first, then one timing.", "Many teachers take 2 or 3 timings on separate days before choosing a practice plan."],
+      rule: "No data yet." });
+    if (!n) return Object.assign(out, { tone: "keep", title: "New phase started",
+      text: "A phase change line was drawn. Take a timing to begin this phase.", bullets: [], rule: "No timings since the last phase change line." });
+
+    const last = phase[n - 1], prev = n > 1 ? phase[n - 2] : null;
+
+    // 1. Retention: aim reached, check due, or check done
+    const ret = retentionInfo(st, set);
+    out.retention = ret;
+    const today = todayStr();
+    if (ret.status === "retained") {
+      return Object.assign(out, { tone: "go", title: "Retained. This set is fluent.",
+        text: `${st.name} reached the aim on ${fmtDate(ret.aimDate)} and held it on the retention check on ${fmtDate(ret.check.date)} (${r1(perMin(ret.check.correct, ret.check.seconds))} correct per minute).`,
+        bullets: [isSlides(set) ? "Move on to a new set, for example slides with a new vowel or new consonants." : "Move on to a new set, or make a new named set that adds 2 or 3 new letter sounds.", "Keep a few of these letters in the warm-up for the next set."],
+        rule: `Rule: on the first timing ${RET_DAYS} or more days after the aim was reached, at least ${Math.round(RET_HOLD * 100)}% of the aim (${r1(RET_HOLD * set.aim)}) and errors at or under the limit.` });
+    }
+    if (ret.status === "due") {
+      const now = today >= ret.dueDate, late = today > ret.lateDate;
+      return Object.assign(out, { tone: "go", title: now ? `Aim reached. Retention check due${late ? " (overdue)" : ""}.` : `Aim reached. Retention check on or after ${fmtDate(ret.dueDate)}.`,
+        text: `${st.name} met the aim (${set.aim} correct and ${set.errMax} or fewer errors per minute) on 2 days in a row, ending ${fmtDate(ret.aimDate)}.`,
+        bullets: [now ? "Do one timing on this set today, with no warm-up or practice first." : `Don't practice this set until then. On or after ${fmtDate(ret.dueDate)}, do one timing with no warm-up or practice first.`,
+          isSlides(set) ? "Meanwhile, move on to a new set, for example slides with a new vowel or new consonants." : "Meanwhile, move on to a new set, or make a new named set that adds 2 or 3 new letter sounds.",
+          "Keep a few of these letters in the warm-up for the next set."],
+        rule: `Rule: aim met on 2 timings in a row, on different days. The retention check is the first timing ${RET_DAYS} or more days later.` });
+    }
+    if (ret.status === "lost" && last === ret.check) {
+      return Object.assign(out, { tone: "change", title: "Not retained. Return to practice on this set.",
+        text: `On the retention check (${fmtDate(ret.check.date)}) ${st.name} had ${r1(perMin(ret.check.correct, ret.check.seconds))} correct and ${r1(perMin(ret.check.errors, ret.check.seconds))} errors per minute. The aim is ${set.aim}.`,
+        bullets: ["Go back to daily practice and timings on this set until the aim is met again on 2 days in a row.",
+          "Draw a phase change line (for example: retention practice) so the decisions use only the new timings.",
+          ...(ret.check.errorItems && Object.keys(ret.check.errorItems).length ? [`Correct the missed sounds first: ${Object.keys(ret.check.errorItems).map(withClue).join(", ")}.`] : [])],
+        rule: `Rule: the retention check was below ${Math.round(RET_HOLD * 100)}% of the aim, or errors were above the limit.` });
+    }
+    // 2. Aim met once
+    if (metAim(last)) {
+      return Object.assign(out, { tone: "go", title: "Aim met once. Confirm it.",
+        text: `${st.name} met the aim on ${fmtDate(last.date)}.`,
+        bullets: ["Do one more timing on a different day. If the aim is met again, move on to new letters."],
+        rule: "Rule: the aim must be met on 2 timings, on different days, before moving on." });
+    }
+    // 3. Very low or very inaccurate: step back
+    if (cRate(last) < 5 || acc(last) < 0.5) {
+      return Object.assign(out, { tone: "stop", title: "Step back. Accuracy before speed.",
+        text: `On the last timing ${st.name} had ${r1(cRate(last))} correct and ${r1(eRate(last))} errors per minute (${Math.round(acc(last) * 100)}% accurate). Speed practice now will mostly practice errors.`,
+        bullets: [
+          `Teach the missed sounds directly (model, lead, test)${missedList.length ? ": " + missedList.slice(0, 6).map(withClue).join(", ") : ""}.`,
+          "Make a smaller named set of 3 to 5 sounds, mostly known ones with 1 or 2 new ones.",
+          "Practice untimed until the student is accurate, then return to timings. Draw a phase change line when you change the set or the teaching."],
+        rule: "Rule: fewer than 5 correct per minute, or less than 50% accurate, on the latest timing." });
+    }
+    // 4. Errors above the limit on 2 timings in a row
+    if (prev && eRate(last) > set.errMax && eRate(prev) > set.errMax && acc(last) < 0.9 && acc(prev) < 0.9) {
+      return Object.assign(out, { tone: "change", title: "Fix errors before building speed.",
+        text: `Errors were above ${set.errMax} per minute on the last 2 timings.`,
+        bullets: [
+          `Error letters in this phase: ${missedList.length ? missedList.slice(0, 6).map((k) => `${withClue(k)}, missed ${missed[k]}`).join("; ") : "not recorded (paper timing)"}.`,
+          "Before each timing, correct those sounds: model the sound, have the student say it, then mix it with known letters.",
+          "If the same letters keep coming up, take them out into a smaller set for a few days.",
+          "Draw a phase change line when you change the plan."],
+        rule: "Rule: errors above the error limit and accuracy below 90% on 2 timings in a row." });
+    }
+    // 5. Not enough data for a celeration line yet
+    const windowed = phase.slice(-CEL_WINDOW);
+    const span = dayNum(windowed[windowed.length - 1].date) - dayNum(windowed[0].date);
+    if (n < MIN_POINTS || span < MIN_DAYS) {
+      if (n >= 4) {
+        const before = Math.max(...phase.slice(0, n - 3).map(cRate));
+        const recent = Math.max(...phase.slice(n - 3).map(cRate));
+        if (recent <= before) {
+          return Object.assign(out, { tone: "change", title: "No new best in 3 timings. Change something.",
+            text: `${st.name}'s best in this phase is ${r1(before)} correct per minute, and the last 3 timings did not beat it.`,
+            bullets: changeOptions(missedList),
+            rule: "Rule: 3 timings in a row without a new personal best." });
+        }
+      }
+      const need = Math.max(MIN_POINTS - n, 0);
+      return Object.assign(out, { tone: "keep", title: "Keep going with the current plan.",
+        text: need ? `${need} more timing${need === 1 ? "" : "s"} in this phase before a celeration line can be drawn.` : `The timings so far cover ${span} day${span === 1 ? "" : "s"}. A celeration line needs at least a week of data.`,
+        bullets: ["Practice daily: a few short practice sprints, then one timing. Chart every timing.",
+          "Look for a new personal best every few days."],
+        rule: `Rule: at least ${MIN_POINTS} timings across ${MIN_DAYS} or more days are needed to judge celeration.` });
+    }
+    // 6. Judge celeration
+    const cel = celeration(windowed, "correct"), errCel = celeration(windowed, "errors");
+    out.cel = cel; out.errCel = errCel;
+    if (!cel) return Object.assign(out, { tone: "keep", title: "Keep going.", text: "", bullets: [], rule: "" });
+    const errNote = errCel && errCel.value > 1.1 && eRate(last) > set.errMax ? ` Errors are also going up (${celText(errCel.value)} per week).` : "";
+    if (cel.value >= minCel) {
+      let proj = "";
+      if (cel.fit.b > 0) {
+        const yNow = cel.fit.a + cel.fit.b * cel.x1;
+        const days = (Math.log10(set.aim) - yNow) / cel.fit.b;
+        if (days > 0) proj = ` At this rate ${st.name} would reach ${set.aim} correct per minute in about ${Math.max(1, Math.round(days / 7))} week${Math.round(days / 7) > 1 ? "s" : ""}.`;
+      }
+      return Object.assign(out, { tone: "keep", title: "On track. Keep the current plan.",
+        text: `Correct sounds are growing at ${celText(cel.value)} per week (the minimum is ×${minCel}).${proj}${errNote}`,
+        bullets: errNote ? ["Keep the plan, and add error correction for the missed sounds before each timing."] : ["Keep practicing and charting daily."],
+        rule: `Rule: celeration of correct sounds at or above ×${minCel} per week, from the last ${windowed.length} timings in this phase.` });
+    }
+    return Object.assign(out, { tone: "change", title: "Growth is too slow. Change something.",
+      text: `Correct sounds are growing at ${celText(cel.value)} per week, below the minimum of ×${minCel}.${errNote}`,
+      bullets: changeOptions(missedList),
+      rule: `Rule: celeration of correct sounds below ×${minCel} per week, from the last ${windowed.length} timings in this phase.` });
+  }
+  function changeOptions(missedList) {
+    return ["Change one thing at a time, then draw a phase change line on the chart so you can see whether it helped. Some options:",
+      "Shorter, more frequent practice: several 10 to 15 second sprints in place of longer practice.",
+      `Add error correction before practice${missedList.length ? " for " + missedList.slice(0, 5).map(withClue).join(", ") : ""}: model, lead, test.`,
+      "Make the set smaller, or swap out letters that look or sound alike (b and d, e and i).",
+      "Add motivation: have the student try to beat their last score and see the chart.",
+      "Check that the student is accurate when untimed. If not, go back to teaching the sounds."];
+  }
+  function decisionHTML(d) {
+    const cls = { go: "d-go", keep: "d-keep", change: "d-change", stop: "d-stop" }[d.tone];
+    const bullets = d.bullets.slice();
+    const lead = bullets.length && /Some options:$/.test(bullets[0]) ? bullets.shift() : "";
+    return `<div class="decision ${cls}">
+      <h3>What to do next: ${esc(d.title)}</h3>
+      ${d.text ? `<p>${esc(d.text)}</p>` : ""}
+      ${lead ? `<p>${esc(lead)}</p>` : ""}
+      ${bullets.length ? `<ul>${bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
+      ${d.rule ? `<div class="rule">${esc(d.rule)}</div>` : ""}
+    </div>`;
+  }
+
+  // ---------- Standard Celeration Chart (daily, semi-log) ----------
+  function chartSVG(st, set) {
+    const sessions = sessionsFor(st, set.id), phases = phasesFor(st, set.id);
+    const full = data.settings.range === "full";
+    const yMin = full ? -3 : -1, yMax = 3, DAYS = 140;
+    const W = 1000, H = full ? 640 : 520, L = 64, R = 70, T = 44, B = 52;
+    const pw = W - L - R, ph = H - T - B;
+    const firstDay = sessions.length ? dayNum(sessions[0].date) : dayNum(todayStr());
+    const lastDay = sessions.length ? dayNum(sessions[sessions.length - 1].date) : firstDay;
+    const sunday = (n) => n - ((n + 4) % 7);   // day 0 (Jan 1 1970) was a Thursday
+    let start = sunday(firstDay);
+    if (lastDay - start > DAYS - 7) start = sunday(lastDay - (DAYS - 14));
+    const X = (n) => L + ((n - start) / DAYS) * pw;
+    const Y = (v) => T + ((yMax - Math.log10(v)) / (yMax - yMin)) * ph;
+    const YL = (lg) => T + ((yMax - lg) / (yMax - yMin)) * ph;
+    let g = "";
+    // vertical lines
+    for (let d = 0; d <= DAYS; d++) {
+      const x = L + (d / DAYS) * pw, wk = d % 7 === 0;
+      g += `<line x1="${x}" y1="${T}" x2="${x}" y2="${T + ph}" stroke="${wk ? "#8FB3CC" : "#DCE8EF"}" stroke-width="${wk ? 1 : 0.6}"/>`;
+    }
+    // horizontal lines
+    for (let e = yMin; e < yMax; e++) {
+      for (let k = 1; k <= 9; k++) {
+        const v = k * Math.pow(10, e), y = Y(v);
+        g += `<line x1="${L}" y1="${y}" x2="${L + pw}" y2="${y}" stroke="${k === 1 ? "#8FB3CC" : "#DCE8EF"}" stroke-width="${k === 1 ? 1 : 0.6}"/>`;
+      }
+    }
+    g += `<rect x="${L}" y="${T}" width="${pw}" height="${ph}" fill="none" stroke="#6E93AE" stroke-width="1.2"/>`;
+    // y labels
+    const lab = (v) => v >= 1 ? String(v) : String(v).replace(/^0/, "");
+    for (let e = yMin; e <= yMax; e++) {
+      [1, 5].forEach((k) => {
+        const v = k * Math.pow(10, e); if (Math.log10(v) > yMax + 1e-9) return;
+        g += `<text x="${L - 8}" y="${Y(v) + 4}" text-anchor="end" font-size="${k === 1 ? 13 : 11}" fill="${k === 1 ? "#1E2B37" : "#5B6B78"}">${lab(+v.toPrecision(3))}</text>`;
+      });
+    }
+    g += `<text transform="translate(16 ${T + ph / 2}) rotate(-90)" text-anchor="middle" font-size="13" fill="#5B6B78">Count per minute</text>`;
+    // x labels: days at bottom, dates at top
+    for (let d = 0; d <= DAYS; d += 14) g += `<text x="${L + (d / DAYS) * pw}" y="${T + ph + 18}" text-anchor="middle" font-size="12" fill="#5B6B78">${d}</text>`;
+    g += `<text x="${L + pw / 2}" y="${H - 8}" text-anchor="middle" font-size="13" fill="#5B6B78">Successive calendar days (heavy lines are Sundays)</text>`;
+    for (let d = 0; d <= DAYS; d += 28) g += `<text x="${L + (d / DAYS) * pw}" y="${T - 8}" text-anchor="middle" font-size="12" fill="#5B6B78">${fmtShort(start + d)}</text>`;
+    // aim lines
+    const aimY = Y(set.aim);
+    g += `<line x1="${L}" y1="${aimY}" x2="${L + pw}" y2="${aimY}" stroke="#2F7D4E" stroke-width="1.5" stroke-dasharray="8 5"/>`;
+    g += `<text x="${L + pw + 6}" y="${aimY + 4}" font-size="12" fill="#2F7D4E">Aim ${set.aim}</text>`;
+    if (set.errMax > 0 && Math.log10(set.errMax) > yMin) {
+      const ey = Y(set.errMax);
+      g += `<line x1="${L}" y1="${ey}" x2="${L + pw}" y2="${ey}" stroke="#A8323E" stroke-width="1" stroke-dasharray="3 5"/>`;
+      g += `<text x="${L + pw + 6}" y="${ey + 4}" font-size="12" fill="#A8323E">Error limit ${set.errMax}</text>`;
+    }
+    // phase lines
+    phases.forEach((p) => {
+      const x = X(dayNum(p.date) - 0.5);
+      if (x < L || x > L + pw) return;
+      g += `<line x1="${x}" y1="${T}" x2="${x}" y2="${T + ph}" stroke="#1E2B37" stroke-width="2" stroke-dasharray="6 4"/>`;
+      g += `<text transform="translate(${x + 5} ${T + 10}) rotate(90)" font-size="12" fill="#1E2B37">${esc((p.note || "Phase change").slice(0, 40))}</text>`;
+    });
+    // group sessions by phase
+    const bounds = phases.map((p) => p.date);
+    const groups = [];
+    const counted = new Set(charted(sessions));
+    sessions.filter((s) => counted.has(s)).forEach((s) => {
+      const gi = bounds.filter((b) => s.date >= b).length;
+      (groups[gi] = groups[gi] || []).push(s);
+    });
+    const inChart = (n) => n >= start && n <= start + DAYS;
+    const pt = (s, key) => {
+      const c = s[key];
+      const v = c > 0 ? perMin(c, s.seconds) : perMin(0.5, s.seconds);
+      return { x: X(dayNum(s.date)), y: Math.max(T, Math.min(T + ph, Y(v))) };
+    };
+    // record floor (1 count per timing)
+    const floors = new Set();
+    sessions.forEach((s) => {
+      const n = dayNum(s.date); if (!inChart(n)) return;
+      const key = n + ":" + s.seconds; if (floors.has(key)) return; floors.add(key);
+      const y = Y(perMin(1, s.seconds));
+      if (y <= T + ph) g += `<line x1="${X(n) - 4}" y1="${y}" x2="${X(n) + 4}" y2="${y}" stroke="#1E2B37" stroke-width="1.5"/>`;
+    });
+    // extra same-day timings that don't count: drawn faintly
+    sessions.filter((s) => !counted.has(s) && inChart(dayNum(s.date))).forEach((s) => {
+      const c = pt(s, "correct"), e = pt(s, "errors");
+      const tip = `${fmtDate(s.date)} (not counted, another timing that day counts): ${r1(perMin(s.correct, s.seconds))} correct, ${r1(perMin(s.errors, s.seconds))} errors per minute`;
+      g += `<g opacity="0.3"><title>${esc(tip)}</title><circle cx="${c.x}" cy="${c.y}" r="4" fill="none" stroke="#2D5F8A" stroke-width="1.5"/><path d="M${e.x - 4},${e.y - 4} L${e.x + 4},${e.y + 4} M${e.x + 4},${e.y - 4} L${e.x - 4},${e.y + 4}" stroke="#A8323E" stroke-width="1.5"/></g>`;
+    });
+    groups.forEach((grp) => {
+      if (!grp) return;
+      const shown = grp.filter((s) => inChart(dayNum(s.date)));
+      ["correct", "errors"].forEach((key) => {
+        if (shown.length > 1) {
+          g += `<polyline points="${shown.map((s) => { const p = pt(s, key); return `${p.x},${p.y}`; }).join(" ")}" fill="none" stroke="${key === "correct" ? "#2D5F8A" : "#A8323E"}" stroke-width="1" opacity="0.45"/>`;
+        }
+      });
+      // celeration lines from the last 10 timings of each phase with enough data
+      const w = grp.slice(-CEL_WINDOW);
+      const spanD = w.length ? dayNum(w[w.length - 1].date) - dayNum(w[0].date) : 0;
+      if (w.length >= MIN_POINTS && spanD >= MIN_DAYS) {
+        ["correct", "errors"].forEach((key) => {
+          const c = celeration(w, key); if (!c) return;
+          const xa = Math.max(c.x0, start), xb = Math.min(c.x1 + 7, start + DAYS);
+          const ya = YL(c.fit.a + c.fit.b * xa), yb = YL(c.fit.a + c.fit.b * xb);
+          const color = key === "correct" ? "#2D5F8A" : "#A8323E";
+          g += `<line x1="${X(xa)}" y1="${ya}" x2="${X(xb)}" y2="${yb}" stroke="${color}" stroke-width="2.5" ${key === "errors" ? 'stroke-dasharray="7 4"' : ""}/>`;
+          g += `<text x="${X(xb) + 4}" y="${yb + (key === "correct" ? -6 : 14)}" font-size="13" font-weight="700" fill="${color}">${celText(c.value)}</text>`;
+        });
+      }
+      shown.forEach((s) => {
+        const tip = `${fmtDate(s.date)}: ${r1(perMin(s.correct, s.seconds))} correct, ${r1(perMin(s.errors, s.seconds))} errors per minute (${s.correct} and ${s.errors} in ${fmtLen(s.seconds)})`;
+        const c = pt(s, "correct"), e = pt(s, "errors");
+        g += `<g><title>${esc(tip)}</title><circle cx="${c.x}" cy="${c.y}" r="5" fill="#2D5F8A"/></g>`;
+        g += `<g><title>${esc(tip)}</title><path d="M${e.x - 5},${e.y - 5} L${e.x + 5},${e.y + 5} M${e.x + 5},${e.y - 5} L${e.x - 5},${e.y + 5}" stroke="#A8323E" stroke-width="2.4" stroke-linecap="round"/></g>`;
+      });
+    });
+    return `<svg xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial, sans-serif" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Daily standard celeration chart for ${esc(st.name)}, ${esc(set.name)}">${g}</svg>`;
+  }
+
+  // ---------- views ----------
+  function shell(inner, current) {
+    const banner = !loading && mode === "local" ? `<div class="panel" style="background:var(--warn-bg);border-color:var(--warn-line)">
+      <strong>Saving in this browser only.</strong> ${noAccessNote ? "Your access to this shared app doesn't allow saving to Claude. " : ""}Results stay on this device and are lost if the browser's data is cleared. Make a backup on the Backup page now and then.</div>` : "";
+    return `<header class="top"><h1><svg class="logo" viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="9" fill="#C8DC8A"/><path d="M8 12H32M8 20H32M8 28H32M14 7V33M22 7V33M30 7V33" stroke="#0C5458" stroke-opacity=".22" stroke-width="1.2"/><path d="M8 30 L32 11" stroke="#0C5458" stroke-width="3.2" stroke-linecap="round"/><circle cx="12" cy="27" r="2.6" fill="#0C5458"/><circle cx="20" cy="21" r="2.6" fill="#0C5458"/><circle cx="28" cy="14" r="2.6" fill="#0C5458"/></svg>Celeration Station</h1>
+      <nav aria-label="Main">
+        <button data-nav="today" ${current === "today" ? 'aria-current="page"' : ""}>Today</button>
+        <button data-nav="home" ${current === "home" ? 'aria-current="page"' : ""}>Students</button>
+        <button data-nav="sets" ${current === "sets" ? 'aria-current="page"' : ""}>Letter sets</button>
+        <button data-nav="backup" ${current === "backup" ? 'aria-current="page"' : ""}>Backup</button>
+        <button data-nav="data" ${current === "data" ? 'aria-current="page"' : ""}>Settings</button>
+      </nav></header>
+      <main>
+        ${saveError ? `<div class="panel" style="border-color:#E3B8BD;background:var(--unknown-bg)"><div class="row spread"><span>Some changes have not saved to Claude yet. Check your internet connection.</span><button class="btn small" id="retrySave">Try again</button></div></div>` : ""}
+        ${banner}
+        ${!loading && current !== "backup" && backupDue() ? `<div class="panel" style="background:var(--warn-bg);border-color:var(--warn-line)">
+          <div class="row spread"><span><strong>Time for a backup.</strong> ${data.settings.lastBackup ? `Last backup: ${new Date(data.settings.lastBackup).toLocaleDateString()}.` : "No backup yet."} There are new timings since then.</span>
+          <button class="btn primary small" data-nav="backup">Back up now</button></div></div>` : ""}
+        ${loading ? `<p class="note">Loading…</p>` : inner}
+      </main>`;
+  }
+
+  function homeView() {
+    const list = sortedStudents().filter((s) => !s.hidden);
+    const hidden = sortedStudents().filter((s) => s.hidden);
+    const rows = list.map((s) => {
+      const lastS = s.sessions.slice().sort((a, b) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0))[0];
+      const set = lastS && getSet(lastS.setId);
+      const info = lastS ? `Last timing ${fmtDate(lastS.date)}: ${r1(perMin(lastS.correct, lastS.seconds))} correct per minute on ${esc(set ? set.name : lastS.setName || "a deleted set")}` : "No timings yet";
+      return `<li class="slim"><div class="slim-text"><span class="student-name">${esc(s.name)}</span>${s.grade ? `<span class="counts">${GRADE_NAMES[s.grade]}</span>` : ""}<span class="counts">${info}</span></div>
+        <div class="row"><button class="btn primary small" data-open="${s.id}">Open</button></div></li>`;
+    }).join("");
+    return shell(`<h2>Students</h2>
+      <p class="note">Open a student to do a timing, see their celeration chart, and get the next step. ${mode === "claude" ? "Saving to your Claude account." : ""}</p>
+      <div class="panel"><div class="row">
+        <input type="text" id="newName" placeholder="Student name" aria-label="Student name" autocomplete="off">
+        <button class="btn primary" id="addStudent">Add student</button></div></div>
+      <div class="panel">${list.length ? `<ul class="student-list">${rows}</ul>` : `<p class="note" style="margin:0">${hidden.length ? "All students are hidden." : "Add your first student above to begin."}</p>`}</div>
+      ${hidden.length ? `<details class="panel"><summary>Hidden students (${hidden.length})</summary>
+        <p class="note" style="margin:8px 0 4px">Their timings are saved, but they are left out of the Today page.</p>
+        <ul class="student-list">${hidden.map((s) => `<li><span class="student-name" style="color:var(--muted)">${esc(s.name)}</span>
+          <div class="row"><button class="btn small" data-open="${s.id}">Open</button><button class="btn small" data-unhide="${s.id}">Unhide</button></div></li>`).join("")}</ul></details>` : ""}`, "home");
+  }
+
+  // ---------- Today: every student's next step ----------
+  const TONE_RANK = { stop: 0, change: 1, go: 2, keep: 3 };
+  const TONE_LABEL = { stop: "Step back", change: "Change something", go: "Move on or check", keep: "Keep going" };
+  function todayRows() {
+    const today = todayStr();
+    const rows = [], retention = [], none = [];
+    sortedStudents().filter((s) => !s.hidden).forEach((st) => {
+      const lastS = st.sessions.slice().sort((a, b) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0))[0];
+      const set = lastS && getSet(lastS.setId);
+      if (!set) { none.push(st); }
+      else {
+        const d = decide(st, set);
+        let rank = TONE_RANK[d.tone];
+        if (d.retention && d.retention.status === "due" && today >= d.retention.dueDate) rank = 1.5;
+        rows.push({ st, set, d, last: lastS, rank });
+      }
+      // retention checks on every set this student has used
+      sortedSets().filter((x) => st.sessions.some((y) => y.setId === x.id)).forEach((x) => {
+        const r = retentionInfo(st, x);
+        if (r.status === "due") retention.push(r);
+        else if ((r.status === "retained" || r.status === "lost") && dayNum(today) - dayNum(r.check.date) <= 30) retention.push(r);
+      });
+    });
+    return { rows, retention, none };
+  }
+  function todayView() {
+    const { rows, retention, none } = todayRows();
+    const today = todayStr();
+    const sorted = rows.slice().sort(ui.todaySort === "name" ? (a, b) => a.st.name.localeCompare(b.st.name)
+      : (a, b) => a.rank - b.rank || a.st.name.localeCompare(b.st.name));
+    const pill = (tone, text) => `<span class="pill ${tone}">${esc(text)}</span>`;
+    const body = sorted.map(({ st, set, d, last }) => {
+      const stale = dayNum(today) - dayNum(last.date);
+      return `<tr>
+        <td><button class="linkbtn" data-open="${st.id}">${esc(st.name)}</button>${st.grade ? `<br><small class="counts">${GRADE_NAMES[st.grade]}</small>` : ""}</td>
+        <td>${esc(set.name)}</td>
+        <td>${fmtDate(last.date)}${stale >= 7 ? `<br><small style="color:var(--unknown)">${stale} days ago</small>` : ""}</td>
+        <td>${r1(perMin(last.correct, last.seconds))} / ${r1(perMin(last.errors, last.seconds))}</td>
+        <td>${d.cel ? celText(d.cel.value) : `<span class="counts">not yet</span>`}</td>
+        <td>${pill(d.tone, TONE_LABEL[d.tone])}<div style="margin-top:4px">${esc(d.title)}</div></td>
+      </tr>`;
+    }).join("");
+    const retRows = retention.sort((a, b) => (a.status === "due" ? 0 : 1) - (b.status === "due" ? 0 : 1) || (a.dueDate || "").localeCompare(b.dueDate || "")).map((r) => {
+      let status;
+      if (r.status === "due") status = today > r.lateDate ? pill("stop", "Overdue") : today >= r.dueDate ? pill("change", "Due now") : pill("keep", `Due ${fmtDate(r.dueDate)}`);
+      else if (r.status === "retained") status = pill("go", `Held on ${fmtDate(r.check.date)}`);
+      else status = pill("stop", `Not held on ${fmtDate(r.check.date)}`);
+      return `<tr><td><button class="linkbtn" data-open="${r.st.id}" data-openset="${r.set.id}">${esc(r.st.name)}</button></td><td>${esc(r.set.name)}</td><td>${fmtDate(r.aimDate)}</td><td>${status}</td></tr>`;
+    }).join("");
+    return shell(`<h2>Today</h2>
+      <p class="note">Each student's next step on the set they were timed on most recently. Students who need a change are listed first.</p>
+      <div class="panel">
+        ${rows.length ? `<div class="row spread" style="margin-bottom:8px"><span class="counts">${rows.length} student${rows.length === 1 ? "" : "s"}</span>
+          <div class="seg" role="group"><button data-todaysort="need" aria-pressed="${ui.todaySort !== "name"}">Sort by need</button><button data-todaysort="name" aria-pressed="${ui.todaySort === "name"}">Sort by name</button></div></div>
+          <div class="table-wrap"><table><thead><tr><th>Student</th><th>Set</th><th>Last timing</th><th>Correct / errors per min</th><th>Celeration</th><th>Next step</th></tr></thead><tbody>${body}</tbody></table></div>`
+          : `<p class="note" style="margin:0">No timings yet.</p>`}
+        ${none.length ? `<p class="counts" style="margin:12px 0 0">No timings yet: ${none.map((x) => `<button class="linkbtn" data-open="${x.id}">${esc(x.name)}</button>`).join(", ")}</p>` : ""}
+      </div>
+      <div class="panel"><h3>Retention checks</h3>
+        <p class="note" style="margin-bottom:8px">After a student meets the aim on 2 days in a row, the first timing ${RET_DAYS} or more days later is the retention check. Do it with no warm-up or practice first. Checks are overdue after ${RET_LATE} days. Results from the last 30 days are shown.</p>
+        ${retRows ? `<div class="table-wrap"><table><thead><tr><th>Student</th><th>Set</th><th>Aim reached</th><th>Retention check</th></tr></thead><tbody>${retRows}</tbody></table></div>` : `<p class="note" style="margin:0">None right now.</p>`}
+      </div>`, "today");
+  }
+
+  function setOptions(selected) {
+    return sortedSets().map((s) => `<option value="${s.id}" ${s.id === selected ? "selected" : ""}>${esc(s.name)} (${s.items.length})</option>`).join("");
+  }
+
+  function studentView() {
+    const st = getStudent(view.id);
+    if (!st) { view = { name: "home" }; return homeView(); }
+    const setsUsed = sortedSets().filter((x) => st.sessions.some((s) => s.setId === x.id));
+    const lastS = st.sessions.slice().sort((a, b) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0))[0];
+    let startSet = ui.startSet[st.id] || (lastS && getSet(lastS.setId) ? lastS.setId : (data.sets[0] && sortedSets()[0].id));
+    if (startSet && !getSet(startSet)) startSet = sortedSets()[0] && sortedSets()[0].id;
+    let chartSet = ui.chartSet[st.id] || startSet;
+    if (!getSet(chartSet)) chartSet = startSet;
+    const seg = (key, opts) => `<div class="seg" role="group">${opts.map(([v, label]) => `<button data-setting="${key}" data-val="${v}" aria-pressed="${String(data.settings[key]) === String(v)}">${label}</button>`).join("")}</div>`;
+    const ss = startSet && getSet(startSet);
+
+    const startPanel = data.sets.length ? `<div class="panel">
+        <h3>Do a timing</h3>
+        <div class="setup-grid">
+          <span>Letter set</span><div class="row"><select id="startSet" aria-label="Letter set">${setOptions(startSet)}</select>
+            <button class="btn small" id="newSetFromStudent">Make a new set</button></div>
+          <span></span><div>${ss ? chips(ss.items, "", isSlides(ss)) : ""}</div>
+          <span>Timing length</span>${seg("seconds", [[30, "30 seconds"], [60, "1 minute"]])}
+          <span>Show letters</span>${seg("mode", [["sheet", "Full page (student reads across)"], ["cards", "One at a time"]])}
+        </div>
+        <div class="row" style="margin-bottom:12px"><span class="counts">Paper probe size:</span>${gradeSelect("probeGrade", st.grade)}
+          <button class="btn" id="printProbe">Print paper probe (PDF)</button></div>
+        <div class="row"><button class="btn primary" id="startRun">Get ready</button>
+          <button class="linkbtn" id="toggleManual">${ui.showManual ? "Hide paper timing entry" : "Enter a timing done on paper"}</button></div>
+        ${ui.showManual ? `<div class="row" style="margin-top:14px;align-items:flex-end">
+          <label class="f">Date<input type="date" id="mDate" value="${todayStr()}"></label>
+          <label class="f">Correct<input type="number" id="mCorrect" min="0" inputmode="numeric"></label>
+          <label class="f">Errors<input type="number" id="mErrors" min="0" inputmode="numeric"></label>
+          <label class="f">Length<select id="mSec"><option value="30">30 seconds</option><option value="60" selected>1 minute</option><option value="120">2 minutes</option></select></label>
+          <label class="f" style="flex:1 1 180px">Error letters (optional)<input type="text" id="mItems" placeholder="for example: b d e e"></label>
+          <button class="btn primary" id="saveManual">Save timing</button></div>` : ""}
+      </div>` : `<div class="panel"><h3>Do a timing</h3><p class="note">First, choose the letters to assess and give the set a name so you can time it again.</p>
+        <button class="btn primary" id="newSetFromStudent">Make a letter set</button></div>`;
+
+    const sprintPanel = data.sets.length ? `<div class="panel">
+        <h3>Practice sprints</h3>
+        <p class="note" style="margin-bottom:12px">Short timed practice rounds. You see the score and missed letters at the end. Sprints are not saved to the chart.</p>
+        <div class="setup-grid">
+          <span>Letter set</span><select id="sprintSet" aria-label="Letter set for sprints" style="justify-self:start">${setOptions(startSet)}</select>
+          <span>Sprint length</span>${seg("sprintSeconds", [[10, "10 seconds"], [15, "15 seconds"], [20, "20 seconds"]])}
+          <span>Show letters</span>${seg("mode", [["sheet", "Full page"], ["cards", "One at a time"]])}
+        </div>
+        <div class="row"><button class="btn primary" id="startSprint">Start sprint</button>
+          ${(ui.sprints[st.id] || []).length ? `<span class="counts">Today's sprints (correct/errors): ${ui.sprints[st.id].map((x) => `${x.correct}/${x.errors}`).join(", ")}</span>` : ""}</div>
+      </div>` : "";
+
+    let chartPart = "";
+    const cs = chartSet && getSet(chartSet);
+    if (cs) {
+      const d = decide(st, cs);
+      const sess = sessionsFor(st, cs.id).slice().reverse();
+      const phases = phasesFor(st, cs.id);
+      const { phaseStart } = currentPhase(st, cs.id);
+      const chooser = setsUsed.length > 1 || (setsUsed.length === 1 && setsUsed[0].id !== cs.id)
+        ? `<label class="f" style="flex-direction:row;align-items:center;gap:8px">Chart for <select id="chartSet">${setsUsed.concat(setsUsed.some((x) => x.id === cs.id) ? [] : [cs]).map((x) => `<option value="${x.id}" ${x.id === cs.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></label>` : "";
+      const countedSet = new Set(chartedFor(st, cs.id));
+      const rows = sess.map((s) => `<tr${countedSet.has(s) ? "" : ' style="color:var(--muted)"'}>
+          <td>${fmtDate(s.date)}${countedSet.has(s) ? "" : "<br><small>not counted</small>"}</td><td>${fmtLen(s.seconds)}</td>
+          <td>${s.correct} (${r1(perMin(s.correct, s.seconds))}/min)</td>
+          <td>${s.errors} (${r1(perMin(s.errors, s.seconds))}/min)</td>
+          <td>${s.correct + s.errors ? Math.round(100 * s.correct / (s.correct + s.errors)) + "%" : ""}</td>
+          <td>${Object.keys(s.errorItems || {}).length ? Object.entries(s.errorItems).sort((a, b) => b[1] - a[1]).map(([k, v]) => esc(k) + (v > 1 ? ` (${v})` : "")).join(", ") : s.manual ? "paper" : "none"}</td>
+          <td><button class="btn small danger" data-delsession="${s.id}">Delete</button></td></tr>`).join("");
+      chartPart = `
+        <div class="row spread" style="margin:26px 0 10px"><h2 style="margin:0">${esc(cs.name)}</h2>${chooser}</div>
+        ${decisionHTML(d)}
+        <div class="panel">
+          <div class="row spread" style="margin-bottom:8px">
+            <div class="counts">Aim: ${cs.aim} correct per minute with ${cs.errMax} or fewer errors. ${d.cel ? `Celeration this phase: correct ${celText(d.cel.value)}${d.errCel ? `, errors ${celText(d.errCel.value)}` : ""} per week.` : ""}</div>
+            <div class="row">${seg("range", [["close", "Close-up"], ["full", "Full chart"]])}<button class="btn small" id="chartPdf" data-set="${cs.id}">Download chart (PDF)</button></div>
+          </div>
+          <div class="chart-wrap">${chartSVG(st, cs)}</div>
+          <div class="legend">
+            <span><svg width="12" height="12"><circle cx="6" cy="6" r="5" fill="#2D5F8A"/></svg> Correct per minute</span>
+            <span><svg width="12" height="12"><path d="M1,1 L11,11 M11,1 L1,11" stroke="#A8323E" stroke-width="2.4"/></svg> Errors per minute</span>
+            <span>Short black dash: record floor (1 per timing). Points below it are zeros.</span>
+            <span>Dashed vertical line: phase change.</span>
+            ${data.settings.sameDay !== "all" ? `<span>Faint marks: extra timings on the same day that don't count (${data.settings.sameDay === "first" ? "the first timing of the day counts" : "the best timing of the day counts"}).</span>` : ""}
+          </div>
+          ${d.missedList.length ? `<p class="letters-line" style="margin:12px 0 0"><strong>Missed in this phase:</strong> ${d.missedList.slice(0, 12).map((k) => `${esc(withClue(k))}, ${d.missed[k]}`).join("; ")}</p>` : ""}
+        </div>
+        <div class="panel">
+          <h3>Phase change lines</h3>
+          <p class="note" style="margin-bottom:10px">Draw one whenever you change the teaching (new practice routine, smaller set, error correction). Decisions after the line use only the timings after it.${phaseStart ? ` Current phase started ${fmtDate(phaseStart)}.` : ""}</p>
+          <div class="row" style="align-items:flex-end">
+            <label class="f">Date<input type="date" id="pDate" value="${todayStr()}"></label>
+            <label class="f" style="flex:1 1 240px">What changed<input type="text" id="pNote" placeholder="for example: added error correction"></label>
+            <button class="btn" id="addPhase">Add phase change line</button>
+          </div>
+          ${phases.length ? `<ul class="student-list" style="margin-top:10px">${phases.map((p) => `<li><span>${fmtDate(p.date)}: ${esc(p.note || "Phase change")}</span><button class="btn small danger" data-delphase="${p.id}">Remove</button></li>`).join("")}</ul>` : ""}
+        </div>
+        <div class="panel"><h3>Timings for ${esc(cs.name)}</h3>
+          ${rows ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Length</th><th>Correct</th><th>Errors</th><th>Accuracy</th><th>Error letters</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<p class="note" style="margin:0">No timings yet for this set.</p>`}
+        </div>`;
+    }
+    return shell(`
+      <p style="margin:0 0 10px"><button class="linkbtn" data-nav="home">All students</button></p>
+      <div class="row spread" style="margin-bottom:16px"><div class="row"><h2 style="margin:0">${esc(st.name)}</h2>
+          <select id="stGrade" aria-label="Grade"><option value="">Grade not set</option>${Object.entries(GRADE_NAMES).map(([k, v]) => `<option value="${k}" ${st.grade === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+        <div class="row"><button class="btn small" id="rename">Rename</button><button class="btn small" id="toggleHide">${st.hidden ? "Unhide" : "Hide"}</button><button class="btn small danger" id="delStudent">Remove student</button></div></div>
+      ${st.hidden ? `<div class="panel" style="background:var(--blue-soft);border-color:#B2D9D4">This student is hidden. Their timings are saved, but they are left out of the Today page.</div>` : ""}
+      ${startPanel}
+      ${sprintPanel}
+      ${chartPart}`, "home");
+  }
+
+  function setsView() {
+    const list = sortedSets();
+    const used = (id) => data.students.reduce((n, s) => n + s.sessions.filter((x) => x.setId === id).length, 0);
+    return shell(`<h2>Letter sets</h2>
+      <p class="note">A named set is the group of letter sounds or slides you time. Use the same set each day so the chart shows growth on the same skill.</p>
+      <div class="panel"><div class="row spread"><button class="btn primary" id="newSet">Make a new set</button>
+        <div class="row"><span class="counts">Paper probe size:</span>${gradeSelect("probeGradeSets")}</div></div></div>
+      ${list.length ? list.map((s) => `<div class="panel">
+        <div class="row spread" style="margin-bottom:8px"><div><div class="student-name">${esc(s.name)}</div>
+          <div class="counts">${isSlides(s) ? `Slides. ${s.items.length} slide${s.items.length === 1 ? "" : "s"}` : `${s.items.length} sound${s.items.length === 1 ? "" : "s"}`}. Aim ${s.aim} correct per minute, ${s.errMax} or fewer errors. ${used(s.id)} timing${used(s.id) === 1 ? "" : "s"} saved.</div></div>
+          <div class="row"><button class="btn small" data-probeset="${s.id}">Print paper probe</button><button class="btn small" data-editset="${s.id}">Edit</button><button class="btn small" data-copyset="${s.id}">Copy</button><button class="btn small danger" data-delset="${s.id}">Delete</button></div></div>
+        ${chips(s.items, "", isSlides(s))}</div>`).join("") : `<div class="panel"><p class="note" style="margin:0">No sets yet.</p></div>`}`, "sets");
+  }
+
+  const CONSONANTS = LETTERS.filter((l) => !VOWELS.includes(l)).concat(DIGRAPHS);
+  const slideCombos = (d) => d.cons.slice().sort((a, b) => CONSONANTS.indexOf(a) - CONSONANTS.indexOf(b))
+    .flatMap((c) => VOWELS.filter((v) => d.vows.includes(v)).map((v) => c + v));
+  const draftItems = (d) => d.kind === "slides" ? slideCombos(d).filter((x) => !d.off.includes(x)) : d.items.slice().sort(itemSort);
+  function setEditView() {
+    const sel = new Set(draft.items);
+    const btn = (x) => `<button data-pick="${x}" aria-pressed="${sel.has(x)}" aria-label="${x}">${glyphSVG(x)}</button>`;
+    const editingUsed = draft.id && data.students.some((s) => s.sessions.some((x) => x.setId === draft.id));
+    const kindSeg = editingUsed ? "" : `<div class="panel"><h3>Kind of set</h3><div class="seg" role="group">
+        <button data-kind="letters" aria-pressed="${draft.kind !== "slides"}">Letter sounds</button>
+        <button data-kind="slides" aria-pressed="${draft.kind === "slides"}">Slides (consonant + short vowel)</button></div>
+        ${draft.kind === "slides" ? `<p class="note" style="margin:10px 0 0">A slide is a consonant and a vowel read together, the way they sound at the start of a CVC word, so the vowel is short (ma as in map). Each slide shows an arrow under the letters pointing right.</p>` : ""}</div>`;
+    if (draft.kind === "slides") {
+      const cs = new Set(draft.cons), vs = new Set(draft.vows), off = new Set(draft.off);
+      const combos = slideCombos(draft), on = combos.filter((x) => !off.has(x));
+      return shell(`
+      <p style="margin:0 0 10px"><button class="linkbtn" id="cancelSet">Cancel</button></p>
+      <h2>${draft.id ? "Edit slide set" : "Make a slide set"}</h2>
+      <p class="note">Pick the consonants and the vowels. The app makes every consonant-vowel slide from them. Tap a slide to leave it out. Then name the set so you can choose it again.</p>
+      ${kindSeg}
+      <div class="panel">
+        <div class="row" style="margin-bottom:6px"><h3 style="margin:0">Consonants</h3>
+          <button class="btn small" data-cpreset="bak1">BAK 1 consonants</button>
+          <button class="btn small" data-cpreset="clear">Clear</button></div>
+        <div class="pick">${CONSONANTS.map((x) => `<button data-pickc="${x}" aria-pressed="${cs.has(x)}" aria-label="${x}">${glyphSVG(x)}</button>`).join("")}</div>
+        <h3>Vowels</h3>
+        <div class="pick">${VOWELS.map((x) => `<button data-pickv="${x}" aria-pressed="${vs.has(x)}" aria-label="${x}">${glyphSVG(x)}</button>`).join("")}</div>
+      </div>
+      <div class="panel">
+        <h3>Slides (${on.length} of ${combos.length} included)</h3>
+        ${combos.length ? `<div class="pick slides">${combos.map((x) => `<button data-slide="${x}" aria-pressed="${!off.has(x)}" aria-label="${x}${off.has(x) ? ", left out" : ""}">${glyphSVG(x, true)}</button>`).join("")}</div>`
+          : `<p class="note" style="margin:0">Pick at least one consonant and one vowel.</p>`}
+      </div>
+      ${setDetailsPanel(editingUsed, "for example: Slides, m s t with a and i")}`, "sets");
+    }
+    return shell(`
+      <p style="margin:0 0 10px"><button class="linkbtn" id="cancelSet">Cancel</button></p>
+      <h2>${draft.id ? "Edit letter set" : "Make a letter set"}</h2>
+      <p class="note">Tap the letter sounds to include. Then name the set so you can choose it again for later timings.</p>
+      ${kindSeg}
+      <div class="panel">
+        <div class="row" style="margin-bottom:6px"><span class="counts">Quick picks:</span>
+          <button class="btn small" data-preset="bak1">BAK 1 letters</button>
+          <button class="btn small" data-preset="all">All 26 letters</button>
+          <button class="btn small" data-preset="vowels">Short vowels</button>
+          <button class="btn small" data-preset="clear">Clear</button></div>
+        <div class="pick">${LETTERS.map(btn).join("")}</div>
+        <h3>Digraphs</h3>
+        <div class="pick">${DIGRAPHS.map(btn).join("")}</div>
+        <p class="counts" style="margin:0">${sel.size} selected${sel.size ? ": " + draft.items.slice().sort(itemSort).join(", ") : ""}</p>
+      </div>
+      ${setDetailsPanel(editingUsed, "for example: BAK 1, first 6 sounds")}`, "sets");
+  }
+  function setDetailsPanel(editingUsed, placeholder) {
+    return `<div class="panel">
+        <div class="row" style="align-items:flex-end">
+          <label class="f" style="flex:1 1 260px">Set name<input type="text" id="setName" value="${esc(draft.name)}" placeholder="${esc(placeholder)}" autocomplete="off"></label>
+          <label class="f">Aim: correct per minute<input type="number" id="setAim" min="1" value="${draft.aim}"></label>
+          <label class="f">Error limit per minute<input type="number" id="setErr" min="0" value="${draft.errMax}"></label>
+        </div>
+        <p class="note" style="margin:10px 0 14px">The aim and error limit drive the decision rules. ${DEFAULT_AIM} correct with ${DEFAULT_ERR} or fewer errors per minute is the starting default here. Change it if your school uses a different aim${draft.kind === "slides" ? " for slides" : ""}.</p>
+        ${editingUsed ? `<p class="note" style="margin:-6px 0 14px">This set already has timings. If you add or remove ${draft.kind === "slides" ? "slides" : "letters"}, the chart will mix two different skills. Use Copy on the Letter sets page to make a new set instead.</p>` : ""}
+        <div class="row"><button class="btn primary" id="saveSet">Save set</button><button class="btn" id="cancelSet2">Cancel</button></div>
+      </div>`;
+  }
+
+  function dataView() {
+    const s = data.settings;
+    return shell(`<h2>Settings and data</h2>
+      <div class="panel"><h3>Decision rules</h3>
+        <div class="row" style="align-items:flex-end;margin-bottom:10px">
+          <label class="f">Minimum celeration per week (×)<input type="number" id="minCel" step="0.05" min="1" value="${s.minCel}"></label>
+          <button class="btn" id="saveSettings">Save</button></div>
+        <h3 style="margin-top:16px">More than one timing on the same day</h3>
+        <div class="seg" role="group" style="margin-bottom:6px">
+          <button data-setting="sameDay" data-val="best" aria-pressed="${(s.sameDay || "best") === "best"}">Count the best timing of the day</button>
+          <button data-setting="sameDay" data-val="first" aria-pressed="${s.sameDay === "first"}">Count the first timing of the day</button>
+          <button data-setting="sameDay" data-val="all" aria-pressed="${s.sameDay === "all"}">Count every timing</button></div>
+        <p class="note" style="margin:0 0 16px">The timing that counts is used for the chart line, celeration, and decisions. The others still show on the chart as faint marks and stay in the timings list. Practice sprints are never counted.</p>
+        <h3>Error marks on the full page</h3>
+        <div class="seg" role="group" style="margin-bottom:6px">
+          <button data-setting="markStyle" data-val="quiet" aria-pressed="${(s.markStyle || "hidden") === "quiet"}">Small gray dot</button>
+          <button data-setting="markStyle" data-val="hidden" aria-pressed="${(s.markStyle || "hidden") === "hidden"}">Hidden</button>
+          <button data-setting="markStyle" data-val="red" aria-pressed="${s.markStyle === "red"}">Red</button></div>
+        <p class="note" style="margin:0 0 16px">How a tapped error looks while the timer is running. All marks show in red after time is up.</p>
+        <h3>Picture clues</h3>
+        <div class="seg" role="group" style="margin-bottom:6px">
+          <button data-setting="showClues" data-val="on" aria-pressed="${s.showClues !== false}">Show Sunform picture clues for missed letters</button>
+          <button data-setting="showClues" data-val="off" aria-pressed="${s.showClues === false}">Don't show picture clues</button></div>
+        <p class="note" style="margin:0 0 16px">For example: s (snake), t (tall tower). There is no picture clue for x or for digraphs.</p>
+        <h3>The rules</h3>
+        <p class="note" style="margin:0">The app checks these rules in order after every timing. Rules 3 to 7 use only timings since the last phase change line:</p>
+        <ol style="margin:6px 0 0;padding-left:22px">
+          <li>Aim met on 2 timings in a row, on different days: aim reached. Move on to new letters. The first timing on this set ${RET_DAYS} or more days later is the retention check (overdue after ${RET_LATE} days).</li>
+          <li>Retention check at or above ${Math.round(RET_HOLD * 100)}% of the aim, with errors at or under the limit: retained, so the set is fluent. Below that: return to practice on the set.</li>
+          <li>Aim met once: confirm with one more timing on another day.</li>
+          <li>Fewer than 5 correct per minute, or under 50% accurate: step back to accuracy and a smaller set.</li>
+          <li>Errors above the set's error limit, and under 90% accurate, on 2 timings in a row: correct errors before building speed.</li>
+          <li>Fewer than 5 timings, or less than 7 days of data: keep going. Exception: after 4 or more timings, 3 in a row without a new personal best means change something.</li>
+          <li>Celeration of correct sounds (from the last 10 timings) at or above the minimum: on track, with a projected date for the aim. Below the minimum: change something and draw a phase change line.</li>
+        </ol>
+      </div>
+      <div class="panel"><h3>Erase</h3><p class="note" style="margin-bottom:10px">Make a backup first (Backup page).</p><button class="btn danger" id="eraseAll">Erase all students, timings, and sets</button></div>`, "data");
+  }
+
+  function backupView() {
+    const last = data.settings.lastBackup;
+    const nT = data.students.reduce((n, s) => n + s.sessions.length, 0);
+    return shell(`<h2>Backup</h2>
+      <p class="note">${mode === "claude" ? "Results already save to your Claude account automatically. A backup file is an extra copy you control, in case you ever need to restore or move your data." : "Results are saved only in this browser on this device. A backup file protects them if the browser's data is cleared, and lets you move them to another device."}</p>
+      <div class="panel"><h3>Make a backup</h3>
+        <p class="counts" style="margin:0 0 12px">${data.students.length} student${data.students.length === 1 ? "" : "s"}, ${nT} timing${nT === 1 ? "" : "s"}, ${data.sets.length} letter set${data.sets.length === 1 ? "" : "s"}. ${last ? `Last backup: ${new Date(last).toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}.` : "No backup made yet."}</p>
+        <div class="row">
+          ${inClaude() ? `<button class="btn primary" id="driveBackup">Back up to Google Drive</button>` : ""}
+          <button class="btn ${inClaude() ? "" : "primary"}" id="backup">Download backup file</button>
+        </div>
+        ${driveStatus ? (driveStatus.ok
+          ? `<p style="margin:12px 0 0;color:var(--known)"><strong>Saved to Google Drive:</strong> ${esc(driveStatus.title)}${driveStatus.url ? ` <a href="${esc(driveStatus.url)}" target="_blank" rel="noopener">Open in Google Drive</a>` : ""}</p>`
+          : `<p style="margin:12px 0 0;color:var(--unknown)">${esc(driveStatus.msg)}</p>`) : ""}
+        ${inClaude() ? `<p class="note" style="margin:12px 0 0">Back up to Google Drive saves a new dated file in My Drive, using the Google Drive connection in your Claude account. The first time, Claude asks you to allow it. Older backups are never replaced.</p>`
+          : `<p class="note" style="margin:12px 0 0">On a Chromebook, the file goes to Downloads; you can drag it into Google Drive from the Files app. On an iPad, open the file from Downloads in the Files app, tap Share, and choose Google Drive.</p>`}
+        <p class="note" style="margin:8px 0 0">The backup includes students, timings, phase change lines, letter sets, and settings. You'll see a reminder on other pages when it has been a week or more and there are new timings.</p>
+      </div>
+      <div class="panel"><h3>Restore</h3>
+        <p class="note" style="margin-bottom:10px">Adds the students, timings, and sets from a backup file. Nothing already here is removed or replaced.</p>
+        <button class="btn" id="restoreBtn">Add from a backup file</button>
+        <input type="file" id="restoreFile" accept=".json,application/json" hidden>
+      </div>
+      <div class="panel"><h3>Spreadsheet</h3>
+        <p class="note" style="margin-bottom:10px">One row per timing, for Google Sheets or Excel. This is for reports, not for restoring.</p>
+        <button class="btn" id="csv">Download timings (CSV)</button>
+      </div>`, "backup");
+  }
+
+  // ---------- timing screens ----------
+  const PAGE = 40;
+  function runView() {
+    const st = getStudent(run.sid), set = getSet(run.setId);
+    const left = Math.max(0, run.remaining);
+    const clock = `${Math.floor(Math.ceil(left) / 60)}:${String(Math.ceil(left) % 60).padStart(2, "0")}`;
+    const bar = `<div class="run-bar">
+      <div><span class="who">${esc(st.name)}</span> <span class="meta">${esc(set.name)}, ${run.practice ? "practice sprint, " : ""}${fmtLen(run.seconds)}</span></div>
+      <div class="row">${run.mode === "sheet" && run.state === "running" ? `<span class="markcount">Errors: ${run.errors.size}</span>
+        <button class="btn small" id="undoMark" ${run.markOrder.length ? "" : "disabled"}>Undo last mark</button>` : ""}
+        <span class="clock ${run.state === "review" ? "done" : ""}" id="clock">${run.state === "review" ? "Time" : clock}</span>
+        <button class="btn small" id="cancelRun">Cancel</button></div></div>`;
+    if (run.state === "ready") {
+      return `<div class="run">${bar}<div class="stage"><div class="ready">
+        <h2>${run.practice ? "Practice sprint" : "Ready"}</h2>
+        ${run.practice ? `<p class="note">${fmtLen(run.seconds)} sprint. The score shows at the end and is not saved to the chart.</p>` : ""}
+        ${run.mode === "sheet" ? `<ul>
+          <li>The student says the sound of each letter, reading across each row.</li>
+          <li>Tap a letter to mark an error (wrong sound, or no answer after about 3 seconds; then point to the next letter). Tap it again to undo.</li>
+          <li>Self-corrections count as correct. If the student fixes a sound within about 3 seconds, tap the letter again to remove the error mark.</li>
+          <li>Tap Next page when the student reaches the end of the page.</li>
+          <li>When time is up, tap the last letter the student answered.</li></ul>`
+        : `<ul><li>One letter shows at a time. The student says its sound.</li>
+          <li>Tap Correct or Incorrect. Keyboard: <kbd>→</kbd> or <kbd>C</kbd> correct, <kbd>←</kbd> or <kbd>X</kbd> incorrect, <kbd>Backspace</kbd> undo.</li>
+          <li>If there's no answer after about 3 seconds, tap Incorrect.</li>
+          <li>Self-corrections count as correct. If you tapped Incorrect and the student fixes the sound within about 3 seconds, tap Undo, then Correct.</li></ul>`}
+        ${run.mode === "sheet" ? `<p class="counts" style="margin:0 0 6px">Error marks while the timer runs:</p>
+        <div class="seg" role="group" style="margin-bottom:14px">
+          <button data-setting="markStyle" data-val="quiet" aria-pressed="${(data.settings.markStyle || "hidden") === "quiet"}">Small gray dot</button>
+          <button data-setting="markStyle" data-val="hidden" aria-pressed="${(data.settings.markStyle || "hidden") === "hidden"}">Hidden</button>
+          <button data-setting="markStyle" data-val="red" aria-pressed="${data.settings.markStyle === "red"}">Red</button></div>
+        <p class="note" style="margin-top:-6px">With Hidden, the letter doesn't change when you tap it. The error count and Undo last mark are at the top by the timer. All marks show in red when time is up so you can check them.</p>` : ""}
+        <p class="note">The timer starts when you press Start.</p>
+        <button class="btn primary" id="go" style="font-size:1.2rem;padding:12px 28px">Start</button>
+      </div></div></div>`;
+    }
+    if (run.mode === "cards") {
+      const item = run.items[run.cardIdx];
+      return `<div class="run">${bar}<div class="stage">
+        <div class="card" role="img" aria-label="${esc(item)}">${glyphSVG(item, run.slide)}</div>
+        <div class="mark-row"><button class="mark no" id="markNo">Incorrect</button><button class="mark yes" id="markYes">Correct</button></div>
+        <div class="keys">Correct ${run.log.filter((x) => x.ok).length}. Incorrect ${run.log.filter((x) => !x.ok).length}. <button class="linkbtn" id="undoCard" ${run.log.length ? "" : "disabled"}>Undo</button></div>
+      </div></div>`;
+    }
+    // sheet
+    const pages = Math.ceil(run.items.length / PAGE);
+    const from = run.page * PAGE;
+    const cells = run.items.slice(from, from + PAGE).map((x, i) => {
+      const idx = from + i;
+      const cls = [run.errors.has(idx) ? "err" : "", run.last !== null && idx > run.last ? "past" : "", run.last === idx ? "last" : ""].join(" ");
+      return `<button class="${cls}" data-cell="${idx}" aria-label="${esc(x)}${run.errors.has(idx) ? ", marked error" : ""}">${glyphSVG(x, run.slide)}</button>`;
+    }).join("");
+    let msg = "";
+    if (run.state === "review") {
+      msg = run.tap === "last"
+        ? `<div class="msg warn">Time! Tap the last letter the student answered.${run.last !== null ? ` <button class="btn small primary" id="toResults">Done</button>` : ""}</div>`
+        : `<div class="msg warn">Tap letters to fix error marks. <button class="btn small primary" id="toResults">Done</button></div>`;
+      msg += `<div class="row" style="justify-content:center;padding:8px"><div class="seg" role="group">
+        <button data-tap="last" aria-pressed="${run.tap === "last"}">Mark last letter</button>
+        <button data-tap="errors" aria-pressed="${run.tap === "errors"}">Fix error marks</button></div></div>`;
+    }
+    return `<div class="run">${bar}${msg}<div class="stage">
+      <div class="sheet ${run.state === "running" && data.settings.markStyle !== "red" ? "m-" + (data.settings.markStyle || "hidden") : ""}">${cells}</div>
+      <div class="sheet-nav">
+        <button class="btn" id="prevPage" ${run.page === 0 ? "disabled" : ""}>Previous page</button>
+        <span>Page ${run.page + 1}${run.state === "review" ? ` of ${pages}` : ""}</span>
+        <button class="btn primary" id="nextPage">Next page</button>
+      </div></div></div>`;
+  }
+
+  function errorListHTML(errList, arrow) {
+    if (!errList.length) return `<p class="note" style="margin:0">None</p>`;
+    return `<div class="chip-row" style="gap:10px 16px">${errList.map(([k, v]) => `<span style="display:inline-flex;align-items:center;gap:6px">
+      <span class="chip err${arrow ? " slide" : ""}" title="${esc(k)}">${glyphSVG(k, arrow)}${v > 1 ? `<span class="n">${v}</span>` : ""}</span>${clueFor(k) ? `<span class="counts">${esc(clueFor(k))}</span>` : ""}</span>`).join("")}</div>`;
+  }
+  function sprintView() {
+    const r = ui.sprintResult, st = getStudent(r.sid), set = getSet(r.setId);
+    const errList = Object.entries(r.errorItems).sort((a, b) => b[1] - a[1] || itemSort(a[0], b[0]));
+    const today = ui.sprints[r.sid] || [];
+    return shell(`<h2>${esc(st.name)}: practice sprint</h2>
+      <p class="note">${esc(set.name)}, ${fmtLen(r.seconds)}. Not saved to the chart.</p>
+      <div class="panel">
+        <div class="stats">
+          <div class="stat c"><div class="v">${r.correct}</div><div class="k">correct (${r1(perMin(r.correct, r.seconds))} per minute)</div></div>
+          <div class="stat e"><div class="v">${r.errors}</div><div class="k">errors</div></div>
+        </div>
+        ${today.length > 1 ? `<p class="counts" style="margin:4px 0 10px">Today's sprints, correct/errors: ${today.map((x) => `${x.correct}/${x.errors}`).join(", ")}</p>` : ""}
+        <h3 style="margin-top:12px">Missed</h3>
+        ${errorListHTML(errList, isSlides(set))}
+        <div class="row" style="margin-top:16px"><button class="btn primary" id="againSprint">Another sprint</button>
+          <button class="btn" data-open="${st.id}">Back to ${esc(st.name)}</button></div>
+      </div>`, "home");
+  }
+
+  function resultsView() {
+    const p = pending, st = getStudent(p.sid), set = getSet(p.setId);
+    const errList = Object.entries(p.errorItems).sort((a, b) => b[1] - a[1] || itemSort(a[0], b[0]));
+    return shell(`<h2>${esc(st.name)}: ${esc(set.name)}</h2>
+      <p class="note">${fmtLen(p.seconds)} timing. Check the numbers, then save.</p>
+      <div class="panel">
+        <div class="stats">
+          <div class="stat c"><div class="v">${p.correct}</div><div class="k">correct${p.seconds !== 60 ? ` (${r1(perMin(p.correct, p.seconds))} per minute)` : " per minute"}</div></div>
+          <div class="stat e"><div class="v">${p.errors}</div><div class="k">errors${p.seconds !== 60 ? ` (${r1(perMin(p.errors, p.seconds))} per minute)` : " per minute"}</div></div>
+          <div class="stat"><div class="v">${p.correct + p.errors ? Math.round(100 * p.correct / (p.correct + p.errors)) : 0}%</div><div class="k">accurate</div></div>
+        </div>
+        <h3 style="margin-top:12px">Error letters</h3>
+        ${errorListHTML(errList, isSlides(set))}
+        <div class="row" style="margin-top:16px;align-items:flex-end">
+          <label class="f">Date<input type="date" id="rDate" value="${p.date}"></label>
+          <button class="btn primary" id="saveResult">Save and chart</button>
+          <button class="btn danger" id="discard">Discard</button>
+        </div>
+      </div>`, "home");
+  }
+
+  // ---------- actions ----------
+  function go(name, extra) { view = Object.assign({ name }, extra || {}); render(); window.scrollTo(0, 0); }
+  let timerId = null, audioCtx = null;
+  function beep() {
+    try {
+      if (!audioCtx) return;
+      const o = audioCtx.createOscillator(), gn = audioCtx.createGain();
+      o.frequency.value = 880; o.connect(gn); gn.connect(audioCtx.destination);
+      gn.gain.setValueAtTime(0.25, audioCtx.currentTime); gn.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.7);
+      o.start(); o.stop(audioCtx.currentTime + 0.7);
+    } catch (e) { /* no sound */ }
+  }
+  function startRun(sid, setId, practice) {
+    const set = getSet(setId);
+    if (!set || !set.items.length) { tell("Choose a letter set first."); return; }
+    const secs = practice ? (Number(data.settings.sprintSeconds) || 15) : (Number(data.settings.seconds) || 60);
+    run = { sid, setId, slide: isSlides(set), practice: !!practice, mode: data.settings.mode, seconds: secs, state: "ready",
+      items: sequence(set.items, data.settings.mode === "sheet" ? PAGE * 4 : 400), page: 0, errors: new Set(), last: null,
+      remaining: secs, cardIdx: 0, log: [], tap: "last", markOrder: [] };
+    go("run");
+  }
+  function beginTiming() {
+    try { const C = window.AudioContext || window.webkitAudioContext; if (C && !audioCtx) audioCtx = new C(); if (audioCtx && audioCtx.resume) audioCtx.resume(); } catch (e) { /* */ }
+    run.state = "running";
+    run.endAt = performance.now() + run.seconds * 1000;
+    render();
+    timerId = setInterval(tick, 100);
+  }
+  function tick() {
+    if (!run || run.state !== "running") { clearInterval(timerId); return; }
+    run.remaining = (run.endAt - performance.now()) / 1000;
+    if (run.remaining <= 0) { clearInterval(timerId); timeUp(); return; }
+    const c = $("clock");
+    if (c) { const s = Math.ceil(run.remaining); c.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+  }
+  function timeUp() {
+    beep();
+    if (run.mode === "cards") { finishCards(); return; }
+    run.state = "review"; run.tap = "last";
+    render();
+  }
+  function stopTimer() { if (timerId) clearInterval(timerId); timerId = null; }
+  function finishCards() {
+    const errorItems = {};
+    run.log.filter((x) => !x.ok).forEach((x) => (errorItems[x.item] = (errorItems[x.item] || 0) + 1));
+    finishRun({ sid: run.sid, setId: run.setId, seconds: run.seconds, mode: "cards", date: todayStr(),
+      correct: run.log.filter((x) => x.ok).length, errors: run.log.filter((x) => !x.ok).length, errorItems });
+  }
+  function finishSheet() {
+    const last = run.last;
+    const errIdx = [...run.errors].filter((i) => i <= last);
+    const errorItems = {};
+    errIdx.forEach((i) => (errorItems[run.items[i]] = (errorItems[run.items[i]] || 0) + 1));
+    finishRun({ sid: run.sid, setId: run.setId, seconds: run.seconds, mode: "sheet", date: todayStr(),
+      correct: last + 1 - errIdx.length, errors: errIdx.length, errorItems });
+  }
+  function finishRun(result) {
+    const practice = run.practice;
+    run = null;
+    if (practice) {
+      ui.sprintResult = result;
+      (ui.sprints[result.sid] = ui.sprints[result.sid] || []).push(result);
+      go("sprint");
+    } else { pending = result; go("results"); }
+  }
+  function markCard(ok) {
+    if (!run || run.state !== "running" || run.mode !== "cards") return;
+    run.log.push({ item: run.items[run.cardIdx], ok });
+    run.cardIdx++;
+    if (run.cardIdx >= run.items.length) run.items = run.items.concat(sequence(getSet(run.setId).items, 200, run.items[run.items.length - 1]));
+    render();
+  }
+  function undoCard() {
+    if (!run || run.state !== "running" || !run.log.length) return;
+    run.log.pop(); run.cardIdx--; render();
+  }
+  function saveSession(p, date) {
+    const st = getStudent(p.sid), set = getSet(p.setId);
+    st.sessions.push({ id: uid(), at: Date.now(), date, setId: p.setId, setName: set ? set.name : "", seconds: p.seconds,
+      correct: p.correct, errors: p.errors, errorItems: p.errorItems || {}, mode: p.mode, manual: !!p.manual });
+    ui.chartSet[st.id] = p.setId; ui.startSet[st.id] = p.setId;
+    save();
+  }
+  function openSetEditor(existing, returnTo) {
+    draft = existing
+      ? { id: existing.id, name: existing.name, items: existing.items.slice(), aim: existing.aim, errMax: existing.errMax, returnTo,
+          kind: existing.kind || "letters", cons: (existing.cons || []).slice(), vows: (existing.vows || []).slice(), off: [] }
+      : { id: null, name: "", items: [], aim: DEFAULT_AIM, errMax: DEFAULT_ERR, returnTo, kind: "letters", cons: [], vows: [], off: [] };
+    if (draft.kind === "slides") draft.off = slideCombos(draft).filter((x) => !draft.items.includes(x));
+    go("setEdit");
+  }
+  function readDraftFields() {
+    if ($("setName")) draft.name = $("setName").value;
+    if ($("setAim")) draft.aim = $("setAim").value;
+    if ($("setErr")) draft.errMax = $("setErr").value;
+  }
+  function leaveSetEditor(savedId) {
+    const back = draft.returnTo; draft = null;
+    if (back && back.name === "student") { if (savedId) ui.startSet[back.id] = savedId; go("student", { id: back.id }); }
+    else go("sets");
+  }
+  async function saveDraft() {
+    readDraftFields();
+    const items = draftItems(draft);
+    if (!items.length) { tell(draft.kind === "slides" ? "Pick at least one consonant and one vowel, with at least one slide included." : "Tap at least one letter to include in the set."); return; }
+    let name = draft.name.trim();
+    if (!name) {
+      const n = await askText("Name this set so you can choose it again for later timings.", "", "Save set");
+      if (!n || !n.trim()) return;
+      name = n.trim();
+    }
+    if (data.sets.some((s) => s.id !== draft.id && s.name.toLowerCase() === name.toLowerCase())) { tell(`There is already a set named "${name}". Choose a different name.`); return; }
+    const aim = Math.max(1, Number(draft.aim) || DEFAULT_AIM), errMax = Math.max(0, Number(draft.errMax));
+    const extra = draft.kind === "slides" ? { kind: "slides", cons: draft.cons.slice(), vows: draft.vows.slice() } : { kind: "letters" };
+    let id = draft.id;
+    if (id) Object.assign(getSet(id), { name, items, aim, errMax: isNaN(errMax) ? DEFAULT_ERR : errMax }, extra);
+    else { id = uid(); data.sets.push(Object.assign({ id, name, items, aim, errMax: isNaN(errMax) ? DEFAULT_ERR : errMax, created: todayStr() }, extra)); }
+    save();
+    leaveSetEditor(id);
+  }
+
+  // ---------- render + events ----------
+  function render() {
+    const app = $("app");
+    if (loading) { app.innerHTML = shell("", ""); return; }
+    let html;
+    if (view.name === "student") html = studentView();
+    else if (view.name === "sets") html = setsView();
+    else if (view.name === "setEdit" && draft) html = setEditView();
+    else if (view.name === "data") html = dataView();
+    else if (view.name === "backup") html = backupView();
+    else if (view.name === "today") html = todayView();
+    else if (view.name === "sprint" && ui.sprintResult) html = sprintView();
+    else if (view.name === "run" && run) html = runView();
+    else if (view.name === "results" && pending) html = resultsView();
+    else { view = { name: "home" }; html = homeView(); }
+    app.innerHTML = html;
+    bind();
+  }
+
+  function bind() {
+    document.querySelectorAll("[data-nav]").forEach((b) => b.onclick = () => go(b.dataset.nav));
+    document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => { if (b.dataset.openset) ui.chartSet[b.dataset.open] = b.dataset.openset; go("student", { id: b.dataset.open }); });
+    document.querySelectorAll("[data-todaysort]").forEach((b) => b.onclick = () => { ui.todaySort = b.dataset.todaysort; render(); });
+    document.querySelectorAll("[data-unhide]").forEach((b) => b.onclick = () => { const x = getStudent(b.dataset.unhide); if (x) { x.hidden = false; save(); render(); } });
+    if ($("retrySave")) $("retrySave").onclick = () => save();
+    document.querySelectorAll("[data-setting]").forEach((b) => b.onclick = () => {
+      const k = b.dataset.setting, v = b.dataset.val;
+      data.settings[k] = (k === "seconds" || k === "sprintSeconds") ? Number(v) : k === "showClues" ? v === "on" : v;
+      save(); render();
+    });
+
+    if (view.name === "home") {
+      const add = () => {
+        const name = $("newName").value.trim();
+        if (!name) { $("newName").focus(); return; }
+        data.students.push({ id: uid(), name, sessions: [], phases: [] });
+        save(); render(); $("newName").focus();
+      };
+      $("addStudent").onclick = add;
+      $("newName").onkeydown = (e) => { if (e.key === "Enter") add(); };
+    }
+
+    if (view.name === "student") {
+      const st = getStudent(view.id); if (!st) return;
+      if ($("startSet")) $("startSet").onchange = (e) => { ui.startSet[st.id] = e.target.value; ui.chartSet[st.id] = e.target.value; render(); };
+      if ($("chartSet")) $("chartSet").onchange = (e) => { ui.chartSet[st.id] = e.target.value; render(); };
+      if ($("newSetFromStudent")) $("newSetFromStudent").onclick = () => openSetEditor(null, { name: "student", id: st.id });
+      if ($("startRun")) $("startRun").onclick = () => startRun(st.id, $("startSet").value);
+      if ($("probeGrade")) $("probeGrade").onchange = (e) => { st.grade = e.target.value; data.settings.probeGrade = e.target.value; save(); render(); };
+      if ($("printProbe")) $("printProbe").onclick = (e) => printProbe(e.currentTarget, getSet($("startSet").value), $("probeGrade").value, st.name);
+      if ($("stGrade")) $("stGrade").onchange = (e) => { st.grade = e.target.value || undefined; if (st.grade) data.settings.probeGrade = st.grade; save(); render(); };
+      if ($("toggleHide")) $("toggleHide").onclick = async () => {
+        if (!st.hidden && !(await ask(`Hide ${st.name}? Their timings stay saved, but they won't show on the Today page. You can unhide them from the bottom of the Students page.`, "Hide"))) return;
+        st.hidden = !st.hidden; save(); render();
+      };
+      if ($("startSprint")) $("startSprint").onclick = () => startRun(st.id, $("sprintSet").value, true);
+      if ($("sprintSet")) $("sprintSet").onchange = (e) => { ui.startSet[st.id] = e.target.value; ui.chartSet[st.id] = e.target.value; render(); };
+      if ($("chartPdf")) $("chartPdf").onclick = (e) => { const cs = getSet(e.currentTarget.dataset.set); busy(e.currentTarget, () => chartPdf(st, cs)); };
+      if ($("toggleManual")) $("toggleManual").onclick = () => { ui.showManual = !ui.showManual; render(); };
+      if ($("saveManual")) $("saveManual").onclick = () => {
+        const c = Number($("mCorrect").value), e = Number($("mErrors").value || 0), date = $("mDate").value;
+        if ($("mCorrect").value === "" || c < 0 || e < 0 || !date) { tell("Enter the date, the number correct, and the number of errors."); return; }
+        const errorItems = {};
+        $("mItems").value.toLowerCase().split(/[\s,]+/).filter(Boolean).forEach((k) => (errorItems[k] = (errorItems[k] || 0) + 1));
+        saveSession({ sid: st.id, setId: $("startSet").value, seconds: Number($("mSec").value), correct: c, errors: e, errorItems, mode: "paper", manual: true }, date);
+        ui.showManual = false; render();
+      };
+      if ($("addPhase")) $("addPhase").onclick = () => {
+        const date = $("pDate").value; if (!date) return;
+        const setId = ui.chartSet[st.id] || $("startSet").value;
+        const cs = getSet(setId) ? setId : $("startSet").value;
+        st.phases.push({ id: uid(), setId: cs, date, note: $("pNote").value.trim() });
+        ui.chartSet[st.id] = cs; save(); render();
+      };
+      document.querySelectorAll("[data-delphase]").forEach((b) => b.onclick = async () => {
+        if (await ask("Remove this phase change line?", "Remove", true)) { st.phases = st.phases.filter((p) => p.id !== b.dataset.delphase); save(); render(); }
+      });
+      document.querySelectorAll("[data-delsession]").forEach((b) => b.onclick = async () => {
+        if (await ask("Delete this timing? It will be removed from the chart.", "Delete", true)) { st.sessions = st.sessions.filter((x) => x.id !== b.dataset.delsession); save(); render(); }
+      });
+      $("rename").onclick = async () => { const n = await askText("Student name", st.name); if (n && n.trim()) { st.name = n.trim(); save(); render(); } };
+      $("delStudent").onclick = async () => {
+        if (await ask(`Remove ${st.name} and all of their timings? This cannot be undone.`, "Remove", true)) { data.students = data.students.filter((x) => x.id !== st.id); save(); go("home"); }
+      };
+    }
+
+    if (view.name === "sets") {
+      $("newSet").onclick = () => openSetEditor(null, { name: "sets" });
+      if ($("probeGradeSets")) $("probeGradeSets").onchange = (e) => { data.settings.probeGrade = e.target.value; save(); };
+      document.querySelectorAll("[data-probeset]").forEach((b) => b.onclick = () => printProbe(b, getSet(b.dataset.probeset), $("probeGradeSets").value, ""));
+      document.querySelectorAll("[data-editset]").forEach((b) => b.onclick = () => openSetEditor(getSet(b.dataset.editset), { name: "sets" }));
+      document.querySelectorAll("[data-copyset]").forEach((b) => b.onclick = () => {
+        const s = getSet(b.dataset.copyset);
+        openSetEditor(null, { name: "sets" });
+        Object.assign(draft, { name: s.name + " (copy)", items: s.items.slice(), aim: s.aim, errMax: s.errMax, kind: s.kind || "letters", cons: (s.cons || []).slice(), vows: (s.vows || []).slice() });
+        if (draft.kind === "slides") draft.off = slideCombos(draft).filter((x) => !draft.items.includes(x));
+        render();
+      });
+      document.querySelectorAll("[data-delset]").forEach((b) => b.onclick = async () => {
+        const s = getSet(b.dataset.delset);
+        const n = data.students.reduce((k, st) => k + st.sessions.filter((x) => x.setId === s.id).length, 0);
+        if (await ask(`Delete the set "${s.name}"?${n ? ` Its ${n} saved timing${n === 1 ? "" : "s"} and phase lines will be deleted too.` : ""}`, "Delete", true)) {
+          data.sets = data.sets.filter((x) => x.id !== s.id);
+          data.students.forEach((st) => { st.sessions = st.sessions.filter((x) => x.setId !== s.id); st.phases = st.phases.filter((p) => p.setId !== s.id); });
+          save(); render();
+        }
+      });
+    }
+
+    if (view.name === "setEdit") {
+      document.querySelectorAll("[data-pick]").forEach((b) => b.onclick = () => {
+        readDraftFields();
+        const x = b.dataset.pick, i = draft.items.indexOf(x);
+        if (i >= 0) draft.items.splice(i, 1); else draft.items.push(x);
+        render();
+      });
+      document.querySelectorAll("[data-preset]").forEach((b) => b.onclick = () => {
+        readDraftFields();
+        const p = b.dataset.preset;
+        draft.items = p === "bak1" ? BAK1.slice() : p === "all" ? LETTERS.slice() : p === "vowels" ? VOWELS.slice() : [];
+        if (p === "bak1" && !draft.name.trim()) draft.name = "BAK 1 letters";
+        render();
+      });
+      document.querySelectorAll("[data-kind]").forEach((b) => b.onclick = () => { readDraftFields(); draft.kind = b.dataset.kind; render(); });
+      const toggle = (arr, x) => { const i = arr.indexOf(x); if (i >= 0) arr.splice(i, 1); else arr.push(x); };
+      document.querySelectorAll("[data-pickc]").forEach((b) => b.onclick = () => { readDraftFields(); toggle(draft.cons, b.dataset.pickc); render(); });
+      document.querySelectorAll("[data-pickv]").forEach((b) => b.onclick = () => { readDraftFields(); toggle(draft.vows, b.dataset.pickv); render(); });
+      document.querySelectorAll("[data-slide]").forEach((b) => b.onclick = () => { readDraftFields(); toggle(draft.off, b.dataset.slide); render(); });
+      document.querySelectorAll("[data-cpreset]").forEach((b) => b.onclick = () => {
+        readDraftFields();
+        draft.cons = b.dataset.cpreset === "bak1" ? BAK1.filter((l) => !VOWELS.includes(l)) : [];
+        render();
+      });
+      $("saveSet").onclick = saveDraft;
+      $("cancelSet").onclick = $("cancelSet2").onclick = () => leaveSetEditor(null);
+    }
+
+    if (view.name === "data") {
+      $("saveSettings").onclick = () => { const v = Number($("minCel").value); if (v >= 1) { data.settings.minCel = v; save(); tell("Saved."); } else tell("Enter a number of 1 or more, such as 1.25."); };
+      $("eraseAll").onclick = async () => {
+        if (await ask("Erase all students, timings, and letter sets? Download a backup first if you may need them.", "Erase all", true)) {
+          data = { students: [], sets: [], settings: Object.assign({}, DEFAULTS) }; save(); go("home");
+        }
+      };
+    }
+
+    if (view.name === "backup") {
+      $("backup").onclick = backupDownload;
+      if ($("driveBackup")) $("driveBackup").onclick = (e) => backupToDrive(e.currentTarget);
+      $("csv").onclick = () => {
+        const q = (v) => `"${String(v).replace(/"/g, '""')}"`;
+        const lines = [["Student", "Set", "Date", "Seconds", "Correct", "Errors", "Correct per minute", "Errors per minute", "Error letters"].map(q).join(",")];
+        sortedStudents().forEach((st) => st.sessions.slice().sort((a, b) => a.date.localeCompare(b.date)).forEach((s) => {
+          const set = getSet(s.setId);
+          lines.push([st.name, set ? set.name : s.setName, s.date, s.seconds, s.correct, s.errors, r1(perMin(s.correct, s.seconds)), r1(perMin(s.errors, s.seconds)),
+            Object.entries(s.errorItems || {}).map(([k, v]) => v > 1 ? `${k} x${v}` : k).join(" ")].map(q).join(","));
+        }));
+        download(`celeration-station-timings-${todayStr()}.csv`, lines.join("\n"), "text/csv");
+      };
+      $("restoreBtn").onclick = () => $("restoreFile").click();
+      $("restoreFile").onchange = (e) => {
+        const f = e.target.files[0]; if (!f) return;
+        const rd = new FileReader();
+        rd.onload = async () => {
+          e.target.value = "";
+          try {
+            const inc = normalize(JSON.parse(rd.result));
+            let addS = 0, addT = 0, addSets = 0;
+            inc.sets.forEach((s) => { if (!getSet(s.id)) { data.sets.push(s); addSets++; } });
+            inc.students.forEach((s) => {
+              const cur = getStudent(s.id);
+              if (!cur) { data.students.push(s); addS++; addT += s.sessions.length; return; }
+              const have = new Set(cur.sessions.map((x) => x.id));
+              s.sessions.forEach((x) => { if (!have.has(x.id)) { cur.sessions.push(x); addT++; } });
+              const hp = new Set(cur.phases.map((x) => x.id));
+              s.phases.forEach((x) => { if (!hp.has(x.id)) cur.phases.push(x); });
+            });
+            save(); render();
+            tell(`Added ${addS} student${addS === 1 ? "" : "s"}, ${addT} timing${addT === 1 ? "" : "s"}, and ${addSets} letter set${addSets === 1 ? "" : "s"}. Nothing already here was removed.`);
+          } catch (err) { tell("That file is not a backup from this app."); }
+        };
+        rd.readAsText(f);
+      };
+    }
+
+    if (view.name === "run" && run) {
+      $("cancelRun").onclick = async () => {
+        const wasRunning = run.state === "running";
+        if (run.state === "ready" || await ask("Cancel this timing? Nothing will be saved.", "Cancel timing", true)) {
+          stopTimer(); const sid = run.sid; run = null; go("student", { id: sid });
+        } else if (wasRunning && run && run.state === "running" && run.remaining <= 0) timeUp();
+      };
+      if ($("go")) $("go").onclick = beginTiming;
+      if ($("undoMark")) $("undoMark").onclick = () => { const i = run.markOrder.pop(); if (i !== undefined) run.errors.delete(i); render(); };
+      if ($("markYes")) $("markYes").onclick = () => markCard(true);
+      if ($("markNo")) $("markNo").onclick = () => markCard(false);
+      if ($("undoCard")) $("undoCard").onclick = undoCard;
+      document.querySelectorAll("[data-cell]").forEach((b) => b.onclick = () => {
+        const i = Number(b.dataset.cell);
+        if (run.state === "running" || (run.state === "review" && run.tap === "errors")) {
+          if (run.errors.has(i)) { run.errors.delete(i); run.markOrder = run.markOrder.filter((x) => x !== i); }
+          else { run.errors.add(i); run.markOrder.push(i); }
+        } else if (run.state === "review") run.last = i;
+        render();
+      });
+      document.querySelectorAll("[data-tap]").forEach((b) => b.onclick = () => { run.tap = b.dataset.tap; render(); });
+      if ($("prevPage")) $("prevPage").onclick = () => { if (run.page > 0) { run.page--; render(); } };
+      if ($("nextPage")) $("nextPage").onclick = () => {
+        run.page++;
+        if ((run.page + 1) * PAGE > run.items.length) run.items = run.items.concat(sequence(getSet(run.setId).items, PAGE * 2, run.items[run.items.length - 1]));
+        render();
+      };
+      if ($("toResults")) $("toResults").onclick = () => { if (run.last === null) { run.tap = "last"; render(); return; } finishSheet(); };
+    }
+
+    if (view.name === "sprint" && ui.sprintResult) {
+      $("againSprint").onclick = () => startRun(ui.sprintResult.sid, ui.sprintResult.setId, true);
+    }
+
+    if (view.name === "results" && pending) {
+      $("saveResult").onclick = () => {
+        const date = $("rDate").value || todayStr();
+        const sid = pending.sid; saveSession(pending, date); pending = null; go("student", { id: sid });
+      };
+      $("discard").onclick = async () => {
+        if (await ask("Discard this timing?", "Discard", true)) { const sid = pending.sid; pending = null; go("student", { id: sid }); }
+      };
+    }
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (view.name !== "run" || !run || run.mode !== "cards" || run.state !== "running" || $("modal")) return;
+    const k = e.key.toLowerCase();
+    if (k === "arrowright" || k === "c") { e.preventDefault(); markCard(true); }
+    else if (k === "arrowleft" || k === "x") { e.preventDefault(); markCard(false); }
+    else if (k === "backspace") { e.preventDefault(); undoCard(); }
+  });
+
+  init();
+})();
+</script>
+</body>
+</html>
