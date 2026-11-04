@@ -626,8 +626,13 @@
         doc.text(`Student: ${nameLine || "________________________"}    Set: ${set.name}    Date: __________`, M, y + 0.5);
         doc.text("Timing:  1 minute  /  30 seconds        Correct: ______    Errors: ______", M, y + 0.75);
         doc.setFontSize(8.5); doc.setTextColor(90);
+        if (slide) {
+          doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(0);
+          doc.text("A slide is correct only if said smoothly as one unit, without sounding it out first. Sounded out first = error.", M, y + 1.3, { maxWidth: PW });
+          doc.setFont("helvetica", "normal"); doc.setTextColor(90);
+        }
         doc.text(`Slash each error. Bracket the last ${w} answered. The number at the end of each row is the total ${w}s through that row.${pages === 1 ? ` If the student finishes, they start again at the top; add ${perPage} for each time through.` : ""}`, M, y + 0.98, { maxWidth: PW });
-        y += 1.3;
+        y += slide ? 1.55 : 1.3;
       };
       header();
       const rowH = 0.34, colW = (PW - 0.7) / G.cols;
@@ -1546,15 +1551,15 @@
         ${run.paper ? `<ul>
           <li>Give the student printed probe <strong>${esc(run.probeCode)}</strong>. Check that the code at the top of their page matches.</li>
           <li>The student reads from the paper. Your screen shows the same page, in the same order.</li>
-          <li>Tap a letter to mark an error. Tap it again to undo, for example if the student self-corrects.</li>
+          <li>Tap a ${run.slide ? "slide" : "letter"} to mark an error. Tap it again to undo, for example if the student self-corrects.</li>
           <li>${run.probePages > 1 ? "Tap Next page when the student turns the page." : "If the student finishes the page before time is up, they start again at the top. Tap Back to top."}</li>
-          <li>When time is up, tap the last letter the student answered.</li></ul>`
+          <li>When time is up, tap the last ${run.slide ? "slide" : "letter"} the student answered.</li></ul>`
         : run.mode === "sheet" ? `<ul>
-          <li>The student says the sound of each letter, reading across each row.</li>
-          <li>Tap a letter to mark an error. Tap it again to undo, for example if the student self-corrects.</li>
+          <li>The student ${run.slide ? "says each slide" : "says the sound of each letter"}, reading across each row.</li>
+          <li>Tap a ${run.slide ? "slide" : "letter"} to mark an error. Tap it again to undo, for example if the student self-corrects.</li>
           <li>Tap Next page when the student reaches the end of the page.</li>
-          <li>When time is up, tap the last letter the student answered.</li></ul>`
-        : `<ul><li>One letter shows at a time. The student says its sound.</li>
+          <li>When time is up, tap the last ${run.slide ? "slide" : "letter"} the student answered.</li></ul>`
+        : `<ul><li>One ${run.slide ? "slide" : "letter"} shows at a time. The student ${run.slide ? "says it" : "says its sound"}.</li>
           <li>Tap Correct or Incorrect. Keyboard: <kbd>→</kbd> or <kbd>C</kbd> correct, <kbd>←</kbd> or <kbd>X</kbd> incorrect, <kbd>Backspace</kbd> undo.</li>
           <li>If you tapped Incorrect and the student self-corrects, tap Undo, then Correct.</li></ul>`}
         ${run.mode === "sheet" && !run.paper ? `<p class="counts" style="margin:0 0 6px">Error marks while the timer runs:</p>
@@ -1610,13 +1615,17 @@
   }
   function errorRuleHTML(slide) {
     const w = slide ? "slide" : "letter";
-    return `<div class="rulebox"><strong>If the student makes an error or doesn't know it</strong>
+    return `${slide ? `<div class="rulebox" style="background:var(--warn-bg);border-color:var(--warn-line)"><strong>What counts as correct for a slide</strong>
+      <ul>
+        <li>The student says the slide smoothly as one unit, without sounding it out first. For example, "ma," not "/m/ ... /a/ ... ma."</li>
+        <li>If the student sounds out the separate sounds first, mark it as an error, even if they blend it correctly after.</li>
+      </ul></div>` : ""}<div class="rulebox"><strong>If the student makes an error or doesn't know it</strong>
       <ul>
         <li><strong>During the timing, don't correct or say the sound.</strong> Mark it as an error and let the student keep going.</li>
         <li>No answer after about 3 seconds: mark it, then point to the next ${w} and say "Next."</li>
         <li>If the student fixes it on their own within about 3 seconds, it counts as correct.</li>
         <li>Don't say "good" or "no" during the timing. Stay neutral.</li>
-        <li><strong>Right after the timing, correct the errors.</strong> For each missed ${w}: model ("This says /m/"), lead ("Say it with me"), test ("What does it say?").</li>
+        <li><strong>Right after the timing, correct the errors.</strong> For each missed ${w}: model ("This says ${slide ? "ma" : "/m/"}"), lead ("Say it with me"), test ("What does it say?").</li>
       </ul></div>`;
   }
   function correctNowHTML(errList, slide) {
