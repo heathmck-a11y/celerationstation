@@ -173,6 +173,9 @@
   .qr-mini { flex: none; width: 58px; height: 58px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: #fff; overflow: hidden; line-height: 0; }
   .qr-mini svg, .qr-big svg { width: 100%; height: 100%; display: block; }
   .qr-big { width: min(260px, 70vw); height: min(260px, 70vw); margin: 0 auto; }
+  .rulebox { background: var(--blue-soft); border: 1px solid #B2D9D4; border-radius: 10px; padding: 10px 14px; margin: 0 0 14px; font-size: 0.95rem; }
+  .rulebox ul { margin: 6px 0 0; padding-left: 20px; }
+  .rulebox li { margin-bottom: 3px; }
   .markcount { font-size: 0.9rem; color: var(--muted); }
   .sheet button.past { opacity: 0.25; }
   .sheet button.last { outline: 4px solid var(--blue); outline-offset: 1px; }
@@ -1513,25 +1516,24 @@
         ${run.paper ? `<ul>
           <li>Give the student printed probe <strong>${esc(run.probeCode)}</strong>. Check that the code at the top of their page matches.</li>
           <li>The student reads from the paper. Your screen shows the same page, in the same order.</li>
-          <li>Tap a letter to mark an error (wrong sound, or no answer after about 3 seconds). Tap it again to undo. Self-corrections count as correct.</li>
+          <li>Tap a letter to mark an error. Tap it again to undo, for example if the student self-corrects.</li>
           <li>Tap Next page when the student turns the page.</li>
           <li>When time is up, tap the last letter the student answered.</li></ul>`
         : run.mode === "sheet" ? `<ul>
           <li>The student says the sound of each letter, reading across each row.</li>
-          <li>Tap a letter to mark an error (wrong sound, or no answer after about 3 seconds; then point to the next letter). Tap it again to undo.</li>
-          <li>Self-corrections count as correct. If the student fixes a sound within about 3 seconds, tap the letter again to remove the error mark.</li>
+          <li>Tap a letter to mark an error. Tap it again to undo, for example if the student self-corrects.</li>
           <li>Tap Next page when the student reaches the end of the page.</li>
           <li>When time is up, tap the last letter the student answered.</li></ul>`
         : `<ul><li>One letter shows at a time. The student says its sound.</li>
           <li>Tap Correct or Incorrect. Keyboard: <kbd>→</kbd> or <kbd>C</kbd> correct, <kbd>←</kbd> or <kbd>X</kbd> incorrect, <kbd>Backspace</kbd> undo.</li>
-          <li>If there's no answer after about 3 seconds, tap Incorrect.</li>
-          <li>Self-corrections count as correct. If you tapped Incorrect and the student fixes the sound within about 3 seconds, tap Undo, then Correct.</li></ul>`}
+          <li>If you tapped Incorrect and the student self-corrects, tap Undo, then Correct.</li></ul>`}
         ${run.mode === "sheet" && !run.paper ? `<p class="counts" style="margin:0 0 6px">Error marks while the timer runs:</p>
         <div class="seg" role="group" style="margin-bottom:14px">
           <button data-setting="markStyle" data-val="quiet" aria-pressed="${(data.settings.markStyle || "hidden") === "quiet"}">Small gray dot</button>
           <button data-setting="markStyle" data-val="hidden" aria-pressed="${(data.settings.markStyle || "hidden") === "hidden"}">Hidden</button>
           <button data-setting="markStyle" data-val="red" aria-pressed="${data.settings.markStyle === "red"}">Red</button></div>
         <p class="note" style="margin-top:-6px">With Hidden, the letter doesn't change when you tap it. The error count and Undo last mark are at the top by the timer. All marks show in red when time is up so you can check them.</p>` : ""}
+        ${errorRuleHTML(run.slide)}
         <p class="note">The timer starts when you press Start.</p>
         <button class="btn primary" id="go" style="font-size:1.2rem;padding:12px 28px">Start</button>
       </div></div></div>`;
@@ -1571,6 +1573,23 @@
       </div></div></div>`;
   }
 
+  // One error rule for every timing and sprint, so scores are comparable from day to day.
+  function errorRuleHTML(slide) {
+    const w = slide ? "slide" : "letter";
+    return `<div class="rulebox"><strong>If the student makes an error or doesn't know it</strong>
+      <ul>
+        <li><strong>During the timing, don't correct or say the sound.</strong> Mark it as an error and let the student keep going.</li>
+        <li>No answer after about 3 seconds: mark it, then point to the next ${w} and say "Next."</li>
+        <li>If the student fixes it on their own within about 3 seconds, it counts as correct.</li>
+        <li>Don't say "good" or "no" during the timing. Stay neutral.</li>
+        <li><strong>Right after the timing, correct the errors.</strong> For each missed ${w}: model ("This says /m/"), lead ("Say it with me"), test ("What does it say?").</li>
+      </ul></div>`;
+  }
+  function correctNowHTML(errList, slide) {
+    if (!errList.length) return "";
+    const w = slide ? "slide" : "letter";
+    return `<div class="rulebox" style="margin-top:12px"><strong>Correct these now:</strong> for each missed ${w}, model ("This says ..."), lead ("Say it with me"), test ("What does it say?")${errList.some(([k]) => clueFor(k)) ? ". Use the picture clue shown next to each letter." : "."}</div>`;
+  }
   function errorListHTML(errList, arrow) {
     if (!errList.length) return `<p class="note" style="margin:0">None</p>`;
     return `<div class="chip-row" style="gap:10px 16px">${errList.map(([k, v]) => `<span style="display:inline-flex;align-items:center;gap:6px">
@@ -1590,6 +1609,7 @@
         ${today.length > 1 ? `<p class="counts" style="margin:4px 0 10px">Today's sprints, correct/errors: ${today.map((x) => `${x.correct}/${x.errors}`).join(", ")}</p>` : ""}
         <h3 style="margin-top:12px">Missed</h3>
         ${errorListHTML(errList, isSlides(set))}
+        ${correctNowHTML(errList, isSlides(set))}
         <div class="row" style="margin-top:16px"><button class="btn primary" id="againSprint">Another sprint</button>
           <button class="btn" data-open="${st.id}">Back to ${esc(st.name)}</button></div>
       </div>`, "home");
@@ -1608,6 +1628,7 @@
         </div>
         <h3 style="margin-top:12px">Error letters</h3>
         ${errorListHTML(errList, isSlides(set))}
+        ${correctNowHTML(errList, isSlides(set))}
         <div class="row" style="margin-top:16px;align-items:flex-end">
           <label class="f">Date<input type="date" id="rDate" value="${p.date}"></label>
           <button class="btn primary" id="saveResult">Save and chart</button>
