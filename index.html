@@ -289,7 +289,7 @@
     back.addEventListener("click", (e) => { if (e.target === back) done(); });
     back.querySelector("#qrClose").focus();
   }
-  const DEFAULTS = { seconds: 60, minCel: 1.25, range: "close", mode: "sheet", probeGrade: "K", lastBackup: 0, sameDay: "best", showClues: true, sprintSeconds: 15, markStyle: "hidden" };
+  const DEFAULTS = { seconds: 60, minCel: 1.25, range: "close", mode: "sheet", probeGrade: "K", lastBackup: 0, sameDay: "best", showClues: true, sprintSeconds: 15, sprintMode: "sheet", markStyle: "hidden" };
   // Sunform picture clue names, shown next to missed letters for error correction (no clue for x)
   const CLUES = { a: "apple", b: "bat and ball", c: "cat", d: "dog", e: "echoing explorer", f: "funny fish", g: "goofy glasses", h: "highchair",
     i: "inchworm", j: "jumper", k: "kicker", l: "long legs", m: "mountain man", n: "newt", o: "octopus", p: "plumbing pipe", q: "queen",
@@ -1131,7 +1131,7 @@
       </div>`, "today");
   }
 
-  const SETUP_KEYS = ["seconds", "mode", "sprintSeconds"];
+  const SETUP_KEYS = ["seconds", "mode", "sprintSeconds", "sprintMode"];
   const pref = (st, key) => st && st.setup && st.setup[key] !== undefined ? st.setup[key] : data.settings[key];
   function currentSetup(st) {
     const out = {};
@@ -1144,7 +1144,7 @@
     const others = sortedStudents().filter((x) => x.id !== st.id);
     const su = currentSetup(st), set = su.setId && getSet(su.setId);
     const summary = [set ? `Letter set: ${set.name}` : null, st.grade ? `Grade: ${GRADE_NAMES[st.grade]}` : null,
-      `Timing length: ${fmtLen(su.seconds)}`, `Show letters: ${su.mode === "cards" ? "one at a time" : "full page"}`, `Sprint length: ${fmtLen(su.sprintSeconds)}`].filter(Boolean);
+      `Timing length: ${fmtLen(su.seconds)}`, `Show letters: ${su.mode === "cards" ? "one at a time (computer)" : su.mode === "paper" ? "paper timing" : "full page (computer)"}`, `Sprint length: ${fmtLen(su.sprintSeconds)}`].filter(Boolean);
     const back = document.createElement("div");
     back.className = "modal-back"; back.id = "modal";
     back.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
@@ -1199,6 +1199,7 @@
     // per-student choices (saved with the student, copied by "Copy setup")
     const sseg = (key, opts) => `<div class="seg" role="group">${opts.map(([v, label]) => `<button data-ssetting="${key}" data-val="${v}" aria-pressed="${String(pref(st, key)) === String(v)}">${label}</button>`).join("")}</div>`;
     const ss = startSet && getSet(startSet);
+    const isPaper = pref(st, "mode") === "paper";
 
     const startPanel = data.sets.length ? `<div class="panel">
         <h3>Do a timing</h3>
@@ -1207,19 +1208,19 @@
             <button class="btn small" id="newSetFromStudent">Make a new set</button></div>
           <span></span><div>${ss ? chips(ss.items, "", isSlides(ss)) : ""}</div>
           <span>Timing length</span>${sseg("seconds", [[30, "30 seconds"], [60, "1 minute"]])}
-          <span>Show letters</span>${sseg("mode", [["sheet", "Full page (student reads across)"], ["cards", "One at a time"]])}
+          <span>Show letters</span><div class="row">${sseg("mode", [["sheet", "Full page (computer)"], ["cards", "One at a time (computer)"], ["paper", "Paper timing"]])}
+            ${isPaper ? `<span class="row" style="gap:8px">${gradeSelect("probeGrade", st.grade)}<button class="btn" id="printProbe">Print paper probe (PDF)</button></span>` : ""}</div>
         </div>
-        <div class="row" style="margin-bottom:12px"><span class="counts">Paper probe size:</span>${gradeSelect("probeGrade", st.grade)}
-          <button class="btn" id="printProbe">Print paper probe (PDF)</button></div>
-        <div class="row"><button class="btn primary" id="startRun">Get ready</button>
-          <button class="linkbtn" id="toggleManual">${ui.showManual ? "Hide paper timing entry" : "Enter a timing done on paper"}</button></div>
-        ${ui.showManual ? `<div class="row" style="margin-top:14px;align-items:flex-end">
+        ${isPaper ? `<div class="panel" style="background:var(--blue-soft);border-color:#B2D9D4;margin:0">
+          <p style="margin:0 0 10px"><strong>After the paper timing, enter the score here.</strong> <span class="counts">Use the teacher scoring copy: the row total at the bracket is the number answered.</span></p>
+          <div class="row" style="align-items:flex-end">
           <label class="f">Date<input type="date" id="mDate" value="${todayStr()}"></label>
           <label class="f">Correct<input type="number" id="mCorrect" min="0" inputmode="numeric"></label>
           <label class="f">Errors<input type="number" id="mErrors" min="0" inputmode="numeric"></label>
-          <label class="f">Length<select id="mSec"><option value="30">30 seconds</option><option value="60" selected>1 minute</option><option value="120">2 minutes</option></select></label>
-          <label class="f" style="flex:1 1 180px">Error letters (optional)<input type="text" id="mItems" placeholder="for example: b d e e"></label>
-          <button class="btn primary" id="saveManual">Save timing</button></div>` : ""}
+          <label class="f">Length<select id="mSec">${[[30, "30 seconds"], [60, "1 minute"], [120, "2 minutes"]].map(([v, l]) => `<option value="${v}" ${Number(pref(st, "seconds")) === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+          <label class="f" style="flex:1 1 180px">Error ${ss && isSlides(ss) ? "slides" : "letters"} (optional)<input type="text" id="mItems" placeholder="${ss && isSlides(ss) ? "for example: ma si" : "for example: b d e e"}"></label>
+          <button class="btn primary" id="saveManual">Save timing</button></div></div>`
+          : `<div class="row"><button class="btn primary" id="startRun">Get ready</button></div>`}
       </div>` : `<div class="panel"><h3>Do a timing</h3><p class="note">First, choose the letters to assess and give the set a name so you can time it again.</p>
         <button class="btn primary" id="newSetFromStudent">Make a letter set</button></div>`;
 
@@ -1229,7 +1230,7 @@
         <div class="setup-grid">
           <span>Letter set</span><select id="sprintSet" aria-label="Letter set for sprints" style="justify-self:start">${setOptions(startSet)}</select>
           <span>Sprint length</span>${sseg("sprintSeconds", [[10, "10 seconds"], [15, "15 seconds"], [20, "20 seconds"]])}
-          <span>Show letters</span>${sseg("mode", [["sheet", "Full page"], ["cards", "One at a time"]])}
+          <span>Show letters</span>${sseg("sprintMode", [["sheet", "Full page (computer)"], ["cards", "One at a time (computer)"]])}
         </div>
         <div class="row"><button class="btn primary" id="startSprint">Start sprint</button>
           ${(ui.sprints[st.id] || []).length ? `<span class="counts">Today's sprints (correct/errors): ${ui.sprints[st.id].map((x) => `${x.correct}/${x.errors}`).join(", ")}</span>` : ""}</div>
@@ -1574,7 +1575,9 @@
   function startRun(sid, setId, practice) {
     const set = getSet(setId);
     if (!set || !set.items.length) { tell("Choose a letter set first."); return; }
-    const stu = getStudent(sid), mode = pref(stu, "mode");
+    const stu = getStudent(sid);
+    let mode = practice ? pref(stu, "sprintMode") : pref(stu, "mode");
+    if (mode !== "cards") mode = "sheet";
     const secs = practice ? (Number(pref(stu, "sprintSeconds")) || 15) : (Number(pref(stu, "seconds")) || 60);
     run = { sid, setId, slide: isSlides(set), practice: !!practice, mode, seconds: secs, state: "ready",
       items: sequence(set.items, mode === "sheet" ? PAGE * 4 : 400), page: 0, errors: new Set(), last: null,
