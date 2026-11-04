@@ -180,6 +180,11 @@
   .qr-mini { flex: none; width: 58px; height: 58px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: #fff; overflow: hidden; line-height: 0; }
   .qr-mini svg, .qr-big svg { width: 100%; height: 100%; display: block; }
   .qr-big { width: min(260px, 70vw); height: min(260px, 70vw); margin: 0 auto; }
+  .chart-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+  .chart-tabs button { text-align: left; border: 1.5px solid var(--line); background: #fff; border-radius: 10px; padding: 6px 14px; line-height: 1.25; }
+  .chart-tabs button[aria-selected="true"] { border-color: var(--blue); background: var(--blue); color: #fff; }
+  .chart-tabs .tabkind { display: block; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; opacity: 0.75; }
+  .chart-tabs .tabn { opacity: 0.75; font-size: 0.85rem; }
   .rulebox { background: var(--blue-soft); border: 1px solid #B2D9D4; border-radius: 10px; padding: 10px 14px; margin: 0 0 14px; font-size: 0.95rem; }
   .rulebox ul { margin: 6px 0 0; padding-left: 20px; }
   .rulebox li { margin-bottom: 3px; }
@@ -1130,14 +1135,19 @@
     const today = todayStr();
     const rows = [], retention = [], none = [];
     sortedStudents().filter((s) => !s.hidden).forEach((st) => {
-      const lastS = st.sessions.slice().sort((a, b) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0))[0];
-      const set = lastS && getSet(lastS.setId);
-      if (!set) { none.push(st); }
+      // one row per set the student is working on (timed in the last 3 weeks), or their most recent set
+      const bySet = {};
+      st.sessions.forEach((x) => { if (getSet(x.setId) && (!bySet[x.setId] || x.date > bySet[x.setId].date || (x.date === bySet[x.setId].date && (x.at || 0) > (bySet[x.setId].at || 0)))) bySet[x.setId] = x; });
+      const lasts = Object.values(bySet).sort((a, b) => b.date.localeCompare(a.date));
+      if (!lasts.length) { none.push(st); }
       else {
-        const d = decide(st, set);
-        let rank = TONE_RANK[d.tone];
-        if (d.retention && d.retention.status === "due" && today >= d.retention.dueDate) rank = 1.5;
-        rows.push({ st, set, d, last: lastS, rank });
+        const active = lasts.filter((x) => dayNum(today) - dayNum(x.date) <= 21);
+        (active.length ? active : [lasts[0]]).forEach((lastS) => {
+          const set = getSet(lastS.setId), d = decide(st, set);
+          let rank = TONE_RANK[d.tone];
+          if (d.retention && d.retention.status === "due" && today >= d.retention.dueDate) rank = 1.5;
+          rows.push({ st, set, d, last: lastS, rank });
+        });
       }
       // retention checks on every set this student has used
       sortedSets().filter((x) => st.sessions.some((y) => y.setId === x.id)).forEach((x) => {
@@ -1157,8 +1167,8 @@
     const body = sorted.map(({ st, set, d, last }) => {
       const stale = dayNum(today) - dayNum(last.date);
       return `<tr>
-        <td><button class="linkbtn" data-open="${st.id}">${esc(st.name)}</button>${st.grade ? `<br><small class="counts">${GRADE_NAMES[st.grade]}</small>` : ""}</td>
-        <td>${esc(set.name)}</td>
+        <td><button class="linkbtn" data-open="${st.id}" data-openset="${set.id}">${esc(st.name)}</button>${st.grade ? `<br><small class="counts">${GRADE_NAMES[st.grade]}</small>` : ""}</td>
+        <td><small class="counts">${isSlides(set) ? "Slides" : "Letter sounds"}</small><br>${esc(set.name)}</td>
         <td>${fmtDate(last.date)}${stale >= 7 ? `<br><small style="color:var(--unknown)">${stale} days ago</small>` : ""}</td>
         <td>${r1(perMin(last.correct, last.seconds))} / ${r1(perMin(last.errors, last.seconds))}</td>
         <td>${d.cel ? celText(d.cel.value) : `<span class="counts">not yet</span>`}</td>
@@ -1173,9 +1183,9 @@
       return `<tr><td><button class="linkbtn" data-open="${r.st.id}" data-openset="${r.set.id}">${esc(r.st.name)}</button></td><td>${esc(r.set.name)}</td><td>${fmtDate(r.aimDate)}</td><td>${status}</td></tr>`;
     }).join("");
     return shell(`<h2>Today</h2>
-      <p class="note">Each student's next step on the set they were timed on most recently. Students who need a change are listed first.</p>
+      <p class="note">Each student's next step on every set they're working on (timed in the last 3 weeks). Rows that need a change are listed first. Tap a name to open that chart.</p>
       <div class="panel">
-        ${rows.length ? `<div class="row spread" style="margin-bottom:8px"><span class="counts">${rows.length} student${rows.length === 1 ? "" : "s"}</span>
+        ${rows.length ? `<div class="row spread" style="margin-bottom:8px"><span class="counts">${(() => { const n = new Set(rows.map((r) => r.st.id)).size; return `${n} student${n === 1 ? "" : "s"}, ${rows.length} chart${rows.length === 1 ? "" : "s"}`; })()}</span>
           <div class="seg" role="group"><button data-todaysort="need" aria-pressed="${ui.todaySort !== "name"}">Sort by need</button><button data-todaysort="name" aria-pressed="${ui.todaySort === "name"}">Sort by name</button></div></div>
           <div class="table-wrap"><table><thead><tr><th>Student</th><th>Set</th><th>Last timing</th><th>Correct / errors per min</th><th>Celeration</th><th>Next step</th></tr></thead><tbody>${body}</tbody></table></div>`
           : `<p class="note" style="margin:0">No timings yet.</p>`}
@@ -1326,8 +1336,12 @@
       const sess = sessionsFor(st, cs.id).slice().reverse();
       const phases = phasesFor(st, cs.id);
       const { phaseStart } = currentPhase(st, cs.id);
-      const chooser = setsUsed.length > 1 || (setsUsed.length === 1 && setsUsed[0].id !== cs.id)
-        ? `<label class="f" style="flex-direction:row;align-items:center;gap:8px">Chart for <select id="chartSet">${setsUsed.concat(setsUsed.some((x) => x.id === cs.id) ? [] : [cs]).map((x) => `<option value="${x.id}" ${x.id === cs.id ? "selected" : ""}>${esc(x.name)}</option>`).join("")}</select></label>` : "";
+      // one tab per set this student has been timed on: each set is its own chart
+      const tabSets = setsUsed.concat(setsUsed.some((x) => x.id === cs.id) ? [] : [cs])
+        .sort((a, b) => (setKind(a) === setKind(b) ? a.name.localeCompare(b.name) : setKind(a) === "letters" ? -1 : 1));
+      const nTimings = (x) => st.sessions.filter((y) => y.setId === x.id).length;
+      const chooser = `<div class="chart-tabs" role="tablist" aria-label="Charts">${tabSets.map((x) => `<button role="tab" data-charttab="${x.id}" aria-selected="${x.id === cs.id}">
+          <span class="tabkind">${isSlides(x) ? "Slides" : "Letter sounds"}</span>${esc(x.name)} <span class="tabn">(${nTimings(x)})</span></button>`).join("")}</div>`;
       const countedSet = new Set(chartedFor(st, cs.id));
       const rows = sess.map((s) => `<tr${countedSet.has(s) ? "" : ' style="color:var(--muted)"'}>
           <td>${fmtDate(s.date)}${countedSet.has(s) ? "" : "<br><small>not counted</small>"}</td><td>${fmtLen(s.seconds)}</td>
@@ -1337,7 +1351,9 @@
           <td>${Object.keys(s.errorItems || {}).length ? Object.entries(s.errorItems).sort((a, b) => b[1] - a[1]).map(([k, v]) => esc(k) + (v > 1 ? ` (${v})` : "")).join(", ") : s.manual ? "typed-in score" : "none"}</td>
           <td><button class="btn small danger" data-delsession="${s.id}">Delete</button></td></tr>`).join("");
       chartPart = `
-        <div class="row spread" style="margin:26px 0 10px"><h2 style="margin:0">${esc(cs.name)}</h2>${chooser}</div>
+        <h3 style="margin:26px 0 8px">Charts${tabSets.length > 1 ? ` <span class="counts" style="font-weight:400">(each set has its own chart; tap to switch)</span>` : ""}</h3>
+        ${chooser}
+        <h2 style="margin:0 0 10px">${isSlides(cs) ? "Slides" : "Letter sounds"}: ${esc(cs.name)}</h2>
         ${decisionHTML(d)}
         <div class="panel">
           <div class="row spread" style="margin-bottom:8px">
@@ -1873,7 +1889,7 @@
         save(); render();
       });
       if ($("copySetup")) $("copySetup").onclick = () => copySetupDialog(st);
-      if ($("chartSet")) $("chartSet").onchange = (e) => { ui.chartSet[st.id] = e.target.value; render(); };
+      document.querySelectorAll("[data-charttab]").forEach((b) => b.onclick = () => { ui.chartSet[st.id] = b.dataset.charttab; render(); });
       if ($("newSetFromStudent")) $("newSetFromStudent").onclick = () => openSetEditor(null, { name: "student", id: st.id }, kindOf(st));
       document.querySelectorAll("[data-kindpick]").forEach((b) => b.onclick = () => {
         st.setup = Object.assign({}, st.setup || {}, { kind: b.dataset.kindpick });
