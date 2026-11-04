@@ -305,7 +305,7 @@
     back.addEventListener("click", (e) => { if (e.target === back) done(); });
     back.querySelector("#qrClose").focus();
   }
-  const DEFAULTS = { seconds: 60, minCel: 1.25, range: "close", mode: "sheet", probeGrade: "K", lastBackup: 0, sameDay: "best", showClues: true, sprintSeconds: 15, sprintMode: "sheet", markStyle: "hidden" };
+  const DEFAULTS = { seconds: 60, minCel: 1.25, range: "close", mode: "sheet", probeGrade: "K", lastBackup: 0, sameDay: "best", showClues: true, sprintSeconds: 15, sprintMode: "sheet", markStyle: "hidden", probeLen: "one", probeCount: 1 };
   // Sunform picture clue names, shown next to missed letters for error correction (no clue for x)
   const CLUES = { a: "apple", b: "bat and ball", c: "cat", d: "dog", e: "echoing explorer", f: "funny fish", g: "goofy glasses", h: "highchair",
     i: "inchworm", j: "jumper", k: "kicker", l: "long legs", m: "mountain man", n: "newt", o: "octopus", p: "plumbing pipe", q: "queen",
@@ -562,84 +562,97 @@
     return glyphCache[key];
   }
   const probeCode = () => { const A = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; let c = ""; for (let i = 0; i < 4; i++) c += A[Math.floor(Math.random() * A.length)]; return c; };
-  const probesFor = (st, setId) => (data.probes || []).filter((p) => p.setId === setId && (!p.sid || (st && p.sid === st.id))).sort((a, b) => b.made - a.made);
-  const probeLabel = (p) => `${p.code}, printed ${new Date(p.made).toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${new Date(p.made).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}${p.sid ? "" : " (not for one student)"}`;
-  async function probePdf(set, gradeKey, studentName, sid) {
+  const probeUsed = (st, p) => !!(st && st.sessions.some((x) => x.probe === p.code));
+  // unused probes first, oldest first (use saved probes in order); then used ones, newest first
+  const probesFor = (st, setId) => (data.probes || []).filter((p) => p.setId === setId && (!p.sid || (st && p.sid === st.id)))
+    .sort((a, b) => (probeUsed(st, a) - probeUsed(st, b)) || (probeUsed(st, a) ? b.made - a.made : a.made - b.made));
+  const probeLabel = (p) => `${p.code}, printed ${new Date(p.made).toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${new Date(p.made).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}${p.pages > 1 ? `, ${p.pages} pages` : ", 1 page"}${p.sid ? "" : " (not for one student)"}${probeUsed(view.name === "student" ? getStudent(view.id) : null, p) ? ", already used" : ""}`;
+  async function probePdf(set, gradeKey, studentName, sid, opts) {
     if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("jsPDF not loaded");
+    opts = opts || {};
     const G0 = PROBE_GRADES[gradeKey] || PROBE_GRADES.K;
     const slide = isSlides(set);
     const G = slide ? { cols: G0.cols - 1, rows: G0.rows } : G0;   // slides are wider, so one fewer per row
     const doc = new window.jspdf.jsPDF({ unit: "in", format: "letter", orientation: "portrait" });
     const M = 0.5, PW = 7.5, perPage = G.cols * G.rows;
-    // enough letters that a student working at the aim for 1 minute won't run out
+    // full length: enough that a student working at the aim for 1 minute won't run out; one page: student goes back to the top if they finish
     const need = Math.max(60, Math.ceil(set.aim * 1.5));
-    const pages = Math.max(1, Math.ceil(need / perPage));
-    const items = sequence(set.items, pages * perPage);
+    const pages = opts.onePage ? 1 : Math.max(1, Math.ceil(need / perPage));
+    const count = Math.max(1, Math.min(10, Number(opts.count) || 1));
     const made = new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
-    const code = probeCode();
     const nameLine = studentName || "";
+    const w = slide ? "slide" : "letter";
+    const made_probes = [];
+    let first = true;
+    const newPage = () => { if (!first) doc.addPage(); first = false; };
 
-    // student copy
-    const top = 1.05, bottom = 10.4, cellW = PW / G.cols, cellH = (bottom - top) / G.rows;
-    for (let pg = 0; pg < pages; pg++) {
-      if (pg > 0) doc.addPage();
-      doc.setFont("helvetica", "normal"); doc.setFontSize(12); doc.setTextColor(0);
-      doc.text("Name:", M, M + 0.2);
-      if (nameLine) doc.text(nameLine, M + 0.62, M + 0.2);
-      doc.setDrawColor(120); doc.setLineWidth(0.01);
-      doc.line(M + 0.6, M + 0.25, M + 4.2, M + 0.25);
-      doc.text("Date:", M + 4.6, M + 0.2); doc.line(M + 5.1, M + 0.25, M + PW, M + 0.25);
-      doc.setFontSize(9); doc.setTextColor(110);
-      doc.text(`${set.name}. Probe ${code}. Page ${pg + 1} of ${pages}.`, M, M + 0.5);
-      for (let r = 0; r < G.rows; r++) {
-        const y = top + r * cellH;
-        if (r > 0) { doc.setDrawColor(215); doc.line(M, y, M + PW, y); }
-        for (let cI = 0; cI < G.cols; cI++) {
-          const item = items[pg * perPage + r * G.cols + cI];
-          const img = glyphImage(item, slide);
-          let h = cellH * 0.86, w = h * img.ratio;
-          if (w > cellW * 0.92) { w = cellW * 0.92; h = w / img.ratio; }
-          doc.addImage(img.src, "PNG", M + cI * cellW + (cellW - w) / 2, y + (cellH - h) / 2, w, h);
+    for (let n = 0; n < count; n++) {
+      const items = sequence(set.items, pages * perPage);
+      let code = probeCode();
+      while ((data.probes || []).some((x) => x.code === code) || made_probes.some((x) => x.code === code)) code = probeCode();
+
+      // student copy
+      const top = 1.05, bottom = 10.4, cellW = PW / G.cols, cellH = (bottom - top) / G.rows;
+      for (let pg = 0; pg < pages; pg++) {
+        newPage();
+        doc.setFont("helvetica", "normal"); doc.setFontSize(12); doc.setTextColor(0);
+        doc.text("Name:", M, M + 0.2);
+        if (nameLine) doc.text(nameLine, M + 0.62, M + 0.2);
+        doc.setDrawColor(120); doc.setLineWidth(0.01);
+        doc.line(M + 0.6, M + 0.25, M + 4.2, M + 0.25);
+        doc.text("Date:", M + 4.6, M + 0.2); doc.line(M + 5.1, M + 0.25, M + PW, M + 0.25);
+        doc.setFontSize(9); doc.setTextColor(110);
+        doc.text(`${set.name}. Probe ${code}.${pages > 1 ? ` Page ${pg + 1} of ${pages}.` : ""}`, M, M + 0.5);
+        for (let r = 0; r < G.rows; r++) {
+          const y = top + r * cellH;
+          if (r > 0) { doc.setDrawColor(215); doc.line(M, y, M + PW, y); }
+          for (let cI = 0; cI < G.cols; cI++) {
+            const item = items[pg * perPage + r * G.cols + cI];
+            const img = glyphImage(item, slide);
+            let h = cellH * 0.86, wd = h * img.ratio;
+            if (wd > cellW * 0.92) { wd = cellW * 0.92; h = wd / img.ratio; }
+            doc.addImage(img.src, "PNG", M + cI * cellW + (cellW - wd) / 2, y + (cellH - h) / 2, wd, h);
+          }
         }
       }
-    }
 
-    // teacher copy: same letters in the same rows, with running counts
-    doc.addPage();
-    let y = M;
-    const header = () => {
-      doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(0);
-      doc.text(`Teacher scoring copy. Probe ${code}`, M, y + 0.2);
-      doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-      doc.text(`Student: ${nameLine || "________________________"}    Set: ${set.name}    Date: __________`, M, y + 0.5);
-      doc.text("Timing:  1 minute  /  30 seconds        Correct: ______    Errors: ______", M, y + 0.75);
-      doc.setFontSize(8.5); doc.setTextColor(90);
-      doc.text(`Slash each error. Bracket the last ${slide ? "slide" : "letter"} answered. The number at the end of each row is the total ${slide ? "slides" : "letters"} through that row.`, M, y + 0.98);
-      y += 1.2;
-    };
-    header();
-    const rowH = 0.34, colW = (PW - 0.7) / G.cols;
-    const totalRows = pages * G.rows;
-    for (let r = 0; r < totalRows; r++) {
-      if (y + rowH > 10.5) { doc.addPage(); y = M; header(); }
-      if (r % G.rows === 0) {
-        doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(90);
-        doc.text(`Student page ${r / G.rows + 1}`, M, y + 0.14); y += 0.22;
+      // teacher copy: same items in the same rows, with running counts
+      newPage();
+      let y = M;
+      const header = () => {
+        doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(0);
+        doc.text(`Teacher scoring copy. Probe ${code}`, M, y + 0.2);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+        doc.text(`Student: ${nameLine || "________________________"}    Set: ${set.name}    Date: __________`, M, y + 0.5);
+        doc.text("Timing:  1 minute  /  30 seconds        Correct: ______    Errors: ______", M, y + 0.75);
+        doc.setFontSize(8.5); doc.setTextColor(90);
+        doc.text(`Slash each error. Bracket the last ${w} answered. The number at the end of each row is the total ${w}s through that row.${pages === 1 ? ` If the student finishes, they start again at the top; add ${perPage} for each time through.` : ""}`, M, y + 0.98, { maxWidth: PW });
+        y += 1.3;
+      };
+      header();
+      const rowH = 0.34, colW = (PW - 0.7) / G.cols;
+      for (let r = 0; r < pages * G.rows; r++) {
+        if (y + rowH > 10.5) { doc.addPage(); y = M; header(); }
+        if (pages > 1 && r % G.rows === 0) {
+          doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(90);
+          doc.text(`Student page ${r / G.rows + 1}`, M, y + 0.14); y += 0.22;
+        }
+        doc.setFont("courier", "normal"); doc.setFontSize(15); doc.setTextColor(0);
+        for (let cI = 0; cI < G.cols; cI++) doc.text(items[r * G.cols + cI], M + cI * colW + 0.1, y + 0.24);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(90);
+        doc.text(String((r + 1) * G.cols), M + PW, y + 0.24, { align: "right" });
+        doc.setDrawColor(225); doc.line(M, y + rowH, M + PW, y + rowH);
+        y += rowH;
       }
-      doc.setFont("courier", "normal"); doc.setFontSize(15); doc.setTextColor(0);
-      for (let cI = 0; cI < G.cols; cI++) doc.text(items[r * G.cols + cI], M + cI * colW + 0.1, y + 0.24);
-      doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(90);
-      doc.text(String((r + 1) * G.cols), M + PW, y + 0.24, { align: "right" });
-      doc.setDrawColor(225); doc.line(M, y + rowH, M + PW, y + rowH);
-      y += rowH;
+      doc.setFontSize(8); doc.setTextColor(130);
+      doc.text(`Made ${made} with Celeration Station.`, M, 10.7);
+      made_probes.push({ id: uid(), code, setId: set.id, sid: sid || null, items, cols: G.cols, rows: G.rows, pages, grade: gradeKey, made: Date.now() + n });
     }
-    doc.setFontSize(8); doc.setTextColor(130);
-    doc.text(`Made ${made} with Celeration Station. After the timing, enter the score with "Enter a timing done on paper."`, M, 10.7);
     const fname = `${(studentName ? studentName + "-" : "") + set.name}`.replace(/[^A-Za-z0-9 _-]/g, "").trim().replace(/\s+/g, "-") || "probe";
-    const ok = await download(`${fname}-probe-${code}.pdf`, doc.output("blob"), "application/pdf");
+    const ok = await download(`${fname}-probe${count > 1 ? "s" : ""}-${made_probes.map((x) => x.code).join("-")}.pdf`, doc.output("blob"), "application/pdf");
     if (ok !== false) {
-      data.probes = (data.probes || []).concat({ id: uid(), code, setId: set.id, sid: sid || null, items, cols: G.cols, rows: G.rows, pages, grade: gradeKey, made: Date.now() });
-      if (data.probes.length > 80) data.probes = data.probes.slice(-80);
+      data.probes = (data.probes || []).concat(made_probes);
+      if (data.probes.length > 120) data.probes = data.probes.slice(-120);
       save();
     }
   }
@@ -720,13 +733,18 @@
     finally { btn.disabled = false; btn.textContent = label; }
   }
   async function printProbe(btn, set, gradeKey, studentName, sid) {
+    const opts = { onePage: data.settings.probeLen !== "full", count: data.settings.probeCount || 1 };
     const label = btn.textContent;
     btn.disabled = true; btn.textContent = "Making PDF…";
-    try { await probePdf(set, gradeKey, studentName, sid); render(); }
+    try { await probePdf(set, gradeKey, studentName, sid, opts); render(); }
     catch (e) { console.error(e); tell("The PDF could not be made. Check your internet connection and try again."); }
     finally { btn.disabled = false; btn.textContent = label; }
   }
   const gradeSelect = (id, value) => `<select id="${id}" aria-label="Grade level for the paper probe">${Object.entries(PROBE_GRADES).map(([k, g]) => `<option value="${k}" ${String(value || data.settings.probeGrade) === k ? "selected" : ""}>${g.label}</option>`).join("")}</select>`;
+  const probeOptsHTML = () => `<select id="probeLen" aria-label="Probe length">
+      <option value="one" ${data.settings.probeLen !== "full" ? "selected" : ""}>1 page per probe</option>
+      <option value="full" ${data.settings.probeLen === "full" ? "selected" : ""}>Full length (2 to 3 pages)</option></select>
+    <select id="probeCount" aria-label="How many probes">${[1, 2, 3, 4, 5].map((n) => `<option value="${n}" ${Number(data.settings.probeCount || 1) === n ? "selected" : ""}>${n} probe${n > 1 ? "s" : ""}</option>`).join("")}</select>`;
   const GRADE_NAMES = { K: "Kindergarten", "1": "1st grade", "2": "2nd grade" };
 
   // ---------- celeration math ----------
@@ -1260,7 +1278,8 @@
           <span></span><div>${ss ? chips(ss.items, "", isSlides(ss)) : ""}</div>
           <span>Timing length</span>${sseg("seconds", [[30, "30 seconds"], [60, "1 minute"]])}
           <span>Show letters</span>${sseg("mode", [["sheet", "Full page (computer)"], ["cards", "One at a time (computer)"], ["paper", "Printed probe (student reads from paper)"]]).replace('class="seg"', 'class="seg stack"')}
-          ${isPaper ? `<span>Printed probe</span><div class="row" style="gap:8px">${gradeSelect("probeGrade", st.grade)}<button class="btn" id="printProbe">Print paper probe (PDF)</button></div>` : ""}
+          ${isPaper ? `<span>Printed probe</span><div><div class="row" style="gap:8px;margin-bottom:8px">${gradeSelect("probeGrade", st.grade)}${probeOptsHTML()}</div>
+            <button class="btn" id="printProbe">Print paper probe (PDF)</button></div>` : ""}
         </div>
         ${isPaper ? (paperProbes.length ? `<div class="row" style="margin-bottom:12px">
             <label class="f" style="flex-direction:row;align-items:center;gap:8px">Probe the student has<select id="paperProbe">${paperProbes.map((p) => `<option value="${p.id}">${esc(probeLabel(p))}</option>`).join("")}</select></label></div>
@@ -1361,7 +1380,7 @@
     return shell(`<h2>Letter sets</h2>
       <p class="note">A named set is the group of letter sounds or slides you time. Use the same set each day so the chart shows growth on the same skill.</p>
       <div class="panel"><div class="row spread"><button class="btn primary" id="newSet">Make a new set</button>
-        <div class="row"><span class="counts">Paper probe size:</span>${gradeSelect("probeGradeSets")}</div></div></div>
+        <div class="row"><span class="counts">Paper probes:</span>${gradeSelect("probeGradeSets")}${probeOptsHTML()}</div></div></div>
       ${list.length ? list.map((s) => `<div class="panel">
         <div class="row spread" style="margin-bottom:8px"><div><div class="student-name">${esc(s.name)}</div>
           <div class="counts">${isSlides(s) ? `Slides. ${s.items.length} slide${s.items.length === 1 ? "" : "s"}` : `${s.items.length} sound${s.items.length === 1 ? "" : "s"}`}. Aim ${s.aim} correct per minute, ${s.errMax} or fewer errors. ${used(s.id)} timing${used(s.id) === 1 ? "" : "s"} saved.</div></div>
@@ -1528,7 +1547,7 @@
           <li>Give the student printed probe <strong>${esc(run.probeCode)}</strong>. Check that the code at the top of their page matches.</li>
           <li>The student reads from the paper. Your screen shows the same page, in the same order.</li>
           <li>Tap a letter to mark an error. Tap it again to undo, for example if the student self-corrects.</li>
-          <li>Tap Next page when the student turns the page.</li>
+          <li>${run.probePages > 1 ? "Tap Next page when the student turns the page." : "If the student finishes the page before time is up, they start again at the top. Tap Back to top."}</li>
           <li>When time is up, tap the last letter the student answered.</li></ul>`
         : run.mode === "sheet" ? `<ul>
           <li>The student says the sound of each letter, reading across each row.</li>
@@ -1579,12 +1598,16 @@
       <div class="sheet ${!run.paper && run.state === "running" && data.settings.markStyle !== "red" ? "m-" + (data.settings.markStyle || "hidden") : ""}"${run.cols ? ` style="grid-template-columns:repeat(${run.cols},1fr);--rows:${run.rows}"` : ""}>${cells}</div>
       <div class="sheet-nav">
         <button class="btn" id="prevPage" ${run.page === 0 ? "disabled" : ""}>Previous page</button>
-        <span>${run.paper ? `Student page ${run.page + 1} of ${pages}` : `Page ${run.page + 1}${run.state === "review" ? ` of ${pages}` : ""}`}</span>
-        <button class="btn primary" id="nextPage" ${run.paper && run.page >= pages - 1 ? "disabled" : ""}>Next page</button>
+        <span>${run.paper ? paperPageLabel() : `Page ${run.page + 1}${run.state === "review" ? ` of ${pages}` : ""}`}</span>
+        <button class="btn primary" id="nextPage" ${run.paper && run.page >= pages - 1 ? "disabled" : ""}>${run.paper && run.probePages === 1 ? "Back to top" : "Next page"}</button>
       </div></div></div>`;
   }
 
   // One error rule for every timing and sprint, so scores are comparable from day to day.
+  function paperPageLabel() {
+    const pp = run.probePages || 1, pg = run.page % pp, pass = Math.floor(run.page / pp) + 1;
+    return `${pp > 1 ? `Student page ${pg + 1} of ${pp}` : "Probe page"}${pass > 1 ? `, time through ${pass}` : ""}`;
+  }
   function errorRuleHTML(slide) {
     const w = slide ? "slide" : "letter";
     return `<div class="rulebox"><strong>If the student makes an error or doesn't know it</strong>
@@ -1671,7 +1694,11 @@
     run = { sid, setId, slide: isSlides(set), practice: !!practice, mode, seconds: secs, state: "ready",
       items: sequence(set.items, mode === "sheet" ? PAGE * 4 : 400), page: 0, errors: new Set(), last: null,
       remaining: secs, cardIdx: 0, log: [], tap: "last", markOrder: [], pageSize: PAGE, cols: null };
-    if (probe) Object.assign(run, { mode: "sheet", paper: true, probeCode: probe.code, items: probe.items.slice(), pageSize: probe.cols * probe.rows, cols: probe.cols, rows: probe.rows });
+    if (probe) {
+      const reps = probe.pages === 1 ? 5 : 1;   // one-page probes: the student goes back to the top if they finish
+      let items = []; for (let i = 0; i < reps; i++) items = items.concat(probe.items);
+      Object.assign(run, { mode: "sheet", paper: true, probeCode: probe.code, items, probePages: probe.pages || 1, pageSize: probe.cols * probe.rows, cols: probe.cols, rows: probe.rows });
+    }
     go("run");
   }
   function beginTiming() {
@@ -1808,6 +1835,8 @@
     document.querySelectorAll("[data-unhide]").forEach((b) => b.onclick = () => { const x = getStudent(b.dataset.unhide); if (x) { x.hidden = false; save(); render(); } });
     if ($("retrySave")) $("retrySave").onclick = () => save();
     if ($("qrOpen")) $("qrOpen").onclick = showQR;
+    if ($("probeLen")) $("probeLen").onchange = (e) => { data.settings.probeLen = e.target.value; save(); };
+    if ($("probeCount")) $("probeCount").onchange = (e) => { data.settings.probeCount = Number(e.target.value); save(); };
     document.querySelectorAll("[data-setting]").forEach((b) => b.onclick = () => {
       const k = b.dataset.setting, v = b.dataset.val;
       data.settings[k] = (k === "seconds" || k === "sprintSeconds") ? Number(v) : k === "showClues" ? v === "on" : v;
