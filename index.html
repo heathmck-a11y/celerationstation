@@ -1148,12 +1148,13 @@
     SETUP_KEYS.forEach((k) => (out[k] = pref(st, k)));
     const sid = ui.startSet[st.id] || (st.setup && st.setup.setId);
     if (sid && getSet(sid)) out.setId = sid;
+    out.kind = kindOf(st);
     return out;
   }
   function copySetupDialog(st) {
     const others = sortedStudents().filter((x) => x.id !== st.id);
     const su = currentSetup(st), set = su.setId && getSet(su.setId);
-    const summary = [set ? `Letter set: ${set.name}` : null, st.grade ? `Grade: ${GRADE_NAMES[st.grade]}` : null,
+    const summary = [`Timing: ${su.kind === "slides" ? "slides" : "letter sounds"}`, set ? `${isSlides(set) ? "Slide" : "Letter"} set: ${set.name}` : null, st.grade ? `Grade: ${GRADE_NAMES[st.grade]}` : null,
       `Timing length: ${fmtLen(su.seconds)}`, `Show letters: ${su.mode === "cards" ? "one at a time (computer)" : su.mode === "paper" ? "printed probe (student reads from paper)" : "full page (computer)"}`, `Sprint length: ${fmtLen(su.sprintSeconds)}`].filter(Boolean);
     const back = document.createElement("div");
     back.className = "modal-back"; back.id = "modal";
@@ -1192,8 +1193,14 @@
     (others.length ? sel : name).focus();
   }
 
-  function setOptions(selected) {
-    return sortedSets().map((s) => `<option value="${s.id}" ${s.id === selected ? "selected" : ""}>${esc(s.name)} (${s.items.length})</option>`).join("");
+  const setKind = (x) => (x && x.kind === "slides" ? "slides" : "letters");
+  function kindOf(st) {
+    if (st.setup && st.setup.kind) return st.setup.kind;
+    const sid = ui.startSet[st.id] || (st.setup && st.setup.setId);
+    return sid && getSet(sid) ? setKind(getSet(sid)) : "letters";
+  }
+  function setOptions(selected, list) {
+    return (list || sortedSets()).map((s) => `<option value="${s.id}" ${s.id === selected ? "selected" : ""}>${esc(s.name)} (${s.items.length})</option>`).join("");
   }
 
   function studentView() {
@@ -1201,9 +1208,12 @@
     if (!st) { view = { name: "home" }; return homeView(); }
     const setsUsed = sortedSets().filter((x) => st.sessions.some((s) => s.setId === x.id));
     const lastS = st.sessions.slice().sort((a, b) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0))[0];
-    let startSet = ui.startSet[st.id] || (st.setup && getSet(st.setup.setId) ? st.setup.setId : null) || (lastS && getSet(lastS.setId) ? lastS.setId : (data.sets[0] && sortedSets()[0].id));
-    if (startSet && !getSet(startSet)) startSet = sortedSets()[0] && sortedSets()[0].id;
-    let chartSet = ui.chartSet[st.id] || startSet;
+    const kind = kindOf(st);
+    const kindSets = sortedSets().filter((x) => setKind(x) === kind);
+    const kindWord = kind === "slides" ? "slide" : "letter";
+    let startSet = ui.startSet[st.id] || (st.setup && getSet(st.setup.setId) ? st.setup.setId : null) || (lastS && getSet(lastS.setId) ? lastS.setId : null);
+    if (!startSet || !kindSets.some((x) => x.id === startSet)) startSet = kindSets[0] ? kindSets[0].id : null;
+    let chartSet = ui.chartSet[st.id] || startSet || (lastS && lastS.setId);
     if (!getSet(chartSet)) chartSet = startSet;
     const seg = (key, opts) => `<div class="seg" role="group">${opts.map(([v, label]) => `<button data-setting="${key}" data-val="${v}" aria-pressed="${String(data.settings[key]) === String(v)}">${label}</button>`).join("")}</div>`;
     // per-student choices (saved with the student, copied by "Copy setup")
@@ -1212,11 +1222,15 @@
     const isPaper = pref(st, "mode") === "paper";
     const paperProbes = ss ? probesFor(st, ss.id) : [];
 
-    const startPanel = data.sets.length ? `<div class="panel">
+    const kindRow = `<span>What are you timing?</span><div class="seg" role="group">
+            <button data-kindpick="letters" aria-pressed="${kind === "letters"}">Letter sounds</button>
+            <button data-kindpick="slides" aria-pressed="${kind === "slides"}">Slides</button></div>`;
+    const startPanel = kindSets.length ? `<div class="panel">
         <h3>Do a timing</h3>
         <div class="setup-grid">
-          <span>Letter set</span><div class="row"><select id="startSet" aria-label="Letter set">${setOptions(startSet)}</select>
-            <button class="btn small" id="newSetFromStudent">Make a new set</button></div>
+          ${kindRow}
+          <span>${kind === "slides" ? "Slide set" : "Letter set"}</span><div class="row"><select id="startSet" aria-label="${kindWord} set">${setOptions(startSet, kindSets)}</select>
+            <button class="btn small" id="newSetFromStudent">Make a new ${kindWord} set</button></div>
           <span></span><div>${ss ? chips(ss.items, "", isSlides(ss)) : ""}</div>
           <span>Timing length</span>${sseg("seconds", [[30, "30 seconds"], [60, "1 minute"]])}
           <span>Show letters</span>${sseg("mode", [["sheet", "Full page (computer)"], ["cards", "One at a time (computer)"], ["paper", "Printed probe (student reads from paper)"]])}
@@ -1238,14 +1252,16 @@
           <label class="f">Length<select id="mSec">${[[30, "30 seconds"], [60, "1 minute"], [120, "2 minutes"]].map(([v, l]) => `<option value="${v}" ${Number(pref(st, "seconds")) === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>
           <label class="f" style="flex:1 1 180px">Error ${ss && isSlides(ss) ? "slides" : "letters"} (optional)<input type="text" id="mItems" placeholder="${ss && isSlides(ss) ? "for example: ma si" : "for example: b d e e"}"></label>
           <button class="btn primary" id="saveManual">Save timing</button></div></div>` : ""}
-      </div>` : `<div class="panel"><h3>Do a timing</h3><p class="note">First, choose the letters to assess and give the set a name so you can time it again.</p>
-        <button class="btn primary" id="newSetFromStudent">Make a letter set</button></div>`;
+      </div>` : `<div class="panel"><h3>Do a timing</h3>
+        <div class="setup-grid">${kindRow}</div>
+        <p class="note">No ${kindWord} sets yet. ${kind === "slides" ? "Pick consonants and vowels" : "Choose the letters to assess"} and give the set a name so you can time it again.</p>
+        <button class="btn primary" id="newSetFromStudent">Make a ${kindWord} set</button></div>`;
 
-    const sprintPanel = data.sets.length ? `<div class="panel">
+    const sprintPanel = kindSets.length ? `<div class="panel">
         <h3>Practice sprints</h3>
-        <p class="note" style="margin-bottom:12px">Short timed practice rounds. You see the score and missed letters at the end. Sprints are not saved to the chart.</p>
+        <p class="note" style="margin-bottom:12px">Short timed practice rounds on ${kind === "slides" ? "slides" : "letter sounds"}. You see the score and what was missed at the end. Sprints are not saved to the chart. To switch to ${kind === "slides" ? "letter sounds" : "slides"}, use What are you timing? above.</p>
         <div class="setup-grid">
-          <span>Letter set</span><select id="sprintSet" aria-label="Letter set for sprints" style="justify-self:start">${setOptions(startSet)}</select>
+          <span>${kind === "slides" ? "Slide set" : "Letter set"}</span><select id="sprintSet" aria-label="Set for sprints" style="justify-self:start">${setOptions(startSet, kindSets)}</select>
           <span>Sprint length</span>${sseg("sprintSeconds", [[10, "10 seconds"], [15, "15 seconds"], [20, "20 seconds"]])}
           <span>Show letters</span>${sseg("sprintMode", [["sheet", "Full page (computer)"], ["cards", "One at a time (computer)"]])}
         </div>
@@ -1673,11 +1689,11 @@
     st.setup = Object.assign({}, st.setup || {}, { setId: p.setId });
     save();
   }
-  function openSetEditor(existing, returnTo) {
+  function openSetEditor(existing, returnTo, newKind) {
     draft = existing
       ? { id: existing.id, name: existing.name, items: existing.items.slice(), aim: existing.aim, errMax: existing.errMax, returnTo,
           kind: existing.kind || "letters", cons: (existing.cons || []).slice(), vows: (existing.vows || []).slice(), off: [] }
-      : { id: null, name: "", items: [], aim: DEFAULT_AIM, errMax: DEFAULT_ERR, returnTo, kind: "letters", cons: [], vows: [], off: [] };
+      : { id: null, name: "", items: [], aim: DEFAULT_AIM, errMax: DEFAULT_ERR, returnTo, kind: newKind === "slides" ? "slides" : "letters", cons: [], vows: [], off: [] };
     if (draft.kind === "slides") draft.off = slideCombos(draft).filter((x) => !draft.items.includes(x));
     draft.softSeen = slideCombos(draft).filter((x) => x === "ce" || x === "ci");
     go("setEdit");
@@ -1689,7 +1705,11 @@
   }
   function leaveSetEditor(savedId) {
     const back = draft.returnTo; draft = null;
-    if (back && back.name === "student") { if (savedId) ui.startSet[back.id] = savedId; go("student", { id: back.id }); }
+    if (back && back.name === "student") {
+      const stu = getStudent(back.id);
+      if (savedId) { ui.startSet[back.id] = savedId; ui.chartSet[back.id] = savedId; if (stu) { stu.setup = Object.assign({}, stu.setup || {}, { setId: savedId, kind: setKind(getSet(savedId)) }); save(); } }
+      go("student", { id: back.id });
+    }
     else go("sets");
   }
   async function saveDraft() {
@@ -1766,7 +1786,12 @@
       });
       if ($("copySetup")) $("copySetup").onclick = () => copySetupDialog(st);
       if ($("chartSet")) $("chartSet").onchange = (e) => { ui.chartSet[st.id] = e.target.value; render(); };
-      if ($("newSetFromStudent")) $("newSetFromStudent").onclick = () => openSetEditor(null, { name: "student", id: st.id });
+      if ($("newSetFromStudent")) $("newSetFromStudent").onclick = () => openSetEditor(null, { name: "student", id: st.id }, kindOf(st));
+      document.querySelectorAll("[data-kindpick]").forEach((b) => b.onclick = () => {
+        st.setup = Object.assign({}, st.setup || {}, { kind: b.dataset.kindpick });
+        delete ui.startSet[st.id]; delete ui.chartSet[st.id];
+        save(); render();
+      });
       if ($("startRun")) $("startRun").onclick = () => startRun(st.id, $("startSet").value);
       if ($("startPaper")) $("startPaper").onclick = () => startRun(st.id, $("startSet").value, false, $("paperProbe").value);
       if ($("probeGrade")) $("probeGrade").onchange = (e) => { st.grade = e.target.value; data.settings.probeGrade = e.target.value; save(); render(); };
