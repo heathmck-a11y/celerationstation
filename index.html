@@ -405,6 +405,7 @@
   const tell = (message) => modal({ message, cancel: null });
 
   // ---------- storage: Claude account when available, otherwise this browser ----------
+  let sampleCap = null;
   let mode = "local", loading = false, remoteDb = null, remoteUid = null, downloadsCap = null;
   let savedCache = {}, saveError = false, saveChain = Promise.resolve(), noAccessNote = false;
 
@@ -434,8 +435,8 @@
     if (window.claude && typeof window.claude.use === "function") {
       loading = true; render();
       try {
-        const [dbCap, userCap, dl] = await Promise.all([window.claude.use("db"), window.claude.use("user"), window.claude.use("downloads")]);
-        downloadsCap = dl;
+        const [dbCap, userCap, dl, smp] = await Promise.all([window.claude.use("db"), window.claude.use("user"), window.claude.use("downloads"), window.claude.use("sample")]);
+        downloadsCap = dl; sampleCap = smp || null;
         const id = userCap ? await userCap.id() : null;
         const canWrite = userCap ? await userCap.can("data.write") : null;
         if (dbCap && id && canWrite === false) { noAccessNote = true; loadLocal(); }
@@ -693,6 +694,7 @@
     return { src: c.toDataURL("image/png"), ratio: W / H };
   }
   async function chartPdf(st, set) {
+    set = effSet(st, set);
     if (!window.jspdf || !window.jspdf.jsPDF) throw new Error("jsPDF not loaded");
     const doc = new window.jspdf.jsPDF({ unit: "in", format: "letter", orientation: "landscape" });
     const M = 0.5, PW = 10, BOTTOM = 8.0;
@@ -809,7 +811,13 @@
   // Retention: after the aim is met on 2 days in a row, the first timing 7+ days later is the retention check.
   const RET_DAYS = 7, RET_LATE = 14, RET_HOLD = 0.9;
   const addDays = (date, n) => { const d = dayToDate(dayNum(date) + n); return d.toISOString().slice(0, 10); };
+  // A student can have their own aim for a set; otherwise the set's aim is used.
+  function effSet(st, set) {
+    const o = st && st.aims && set && st.aims[set.id];
+    return o && !set._eff ? Object.assign({}, set, { aim: o.aim, errMax: o.errMax, custom: true, _eff: true }) : set;
+  }
   function retentionInfo(st, set) {
+    set = effSet(st, set);
     const list = chartedFor(st, set.id);
     const met = (x) => perMin(x.correct, x.seconds) >= set.aim && perMin(x.errors, x.seconds) <= set.errMax;
     let info = { status: "none" }, i = 1;
@@ -838,6 +846,7 @@
 
   // ---------- decision rules ----------
   function decide(st, set) {
+    set = effSet(st, set);
     const minCel = Number(data.settings.minCel) || 1.25;
     const { all, phase } = currentPhase(st, set.id);
     const n = phase.length;
@@ -851,7 +860,7 @@
 
     if (!all.length) return Object.assign(out, { tone: "keep", title: "Take a first timing",
       text: `No timings yet for ${set.name}. The first timing shows where ${st.name} is starting.`,
-      bullets: ["Do a short warm-up with the letters first, then one timing.", "Many teachers take 2 or 3 timings on separate days before choosing a practice plan."],
+      bullets: ["Do a short warm-up with the letters first, then one timing.", "Many teachers take 2 or 3 timings on separate days before choosing a practice plan. Use Help me make a practice plan below when you're ready."],
       rule: "No data yet." });
     if (!n) return Object.assign(out, { tone: "keep", title: "New phase started",
       text: "A phase change line was drawn. Take a timing to begin this phase.", bullets: [], rule: "No timings since the last phase change line." });
@@ -964,6 +973,172 @@
       "Add motivation: have the student try to beat their last score and see the chart.",
       "Check that the student is accurate when untimed. If not, go back to teaching the sounds."];
   }
+  // ---------- practice plan helper ----------
+  const FOCUS = {
+    accuracy: "Accuracy first: the student is often wrong or very slow, so teach the sounds before building speed.",
+    errors: "Fix errors: the student is fairly quick but keeps missing the same items.",
+    speed: "Build speed: the student is accurate and needs more fluent practice.",
+    retention: "Keep it strong: the aim was reached; practice new items and keep these in the warm-up.",
+  };
+  function suggestedFocus(d) {
+    if (d.tone === "stop") return "accuracy";
+    if (/Fix errors/.test(d.title)) return "errors";
+    if (d.retention && (d.retention.status === "due" || d.retention.status === "retained")) return "retention";
+    return "speed";
+  }
+  function buildPlan(o, st, set) {
+    const e = effSet(st, set), slide = isSlides(set), w = slide ? "slides" : "letter sounds", w1 = slide ? "slide" : "letter";
+    const targets = o.targets.split(/[\s,]+/).filter(Boolean);
+    const tList = targets.length ? targets.map((k) => (o.clues && clueFor(k) ? `${k} (${clueFor(k)})` : k)).join(", ") : `the ${w} missed most often`;
+    const sprintN = o.mins <= 5 ? 2 : o.mins <= 10 ? 4 : 6, sl = Number(pref(st, "sprintSeconds")) || 15, tl = fmtLen(Number(pref(st, "seconds")) || 60);
+    const L = [];
+    L.push(`PRACTICE PLAN: ${st.name}, ${set.name} (${slide ? "slides" : "letter sounds"})`);
+    L.push(`Made ${new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" })}. ${o.days} days a week, about ${o.mins} minutes each session.`);
+    L.push(`Aim: ${e.aim} correct per minute with ${e.errMax} or fewer errors.`);
+    L.push(`Focus: ${FOCUS[o.focus]}`);
+    L.push("");
+    L.push("EACH SESSION");
+    if (o.focus === "accuracy") {
+      L.push(`1. Teach (about ${Math.max(2, Math.round(o.mins * 0.4))} min): model, lead, test for ${tList}. "This says ___. Say it with me. What does it say?"`);
+      L.push(`2. Untimed practice (about ${Math.max(2, Math.round(o.mins * 0.4))} min): mix 1 new ${w1} with 3 or 4 known ones on cards. Correct right away. Stop when the student is accurate on the new ${w1} 3 times in a row.`);
+      L.push(`3. One ${sl}-second sprint on a small set (3 to 5 ${w}), with correction right away.`);
+      L.push(`4. Timing: one timing (${tl}) on the full set, no correcting during it. Correct the errors right after.`);
+    } else if (o.focus === "errors") {
+      L.push(`1. Error correction warm-up (about 2 min): model, lead, test for ${tList}. Then mix each one with known ${w}.`);
+      L.push(`2. Practice sprints (about ${Math.max(2, o.mins - 4)} min): ${sprintN} sprints of ${sl} seconds, with a short break and error correction between sprints. Correct errors right away during sprints. Before each sprint, have the student say the missed ${w} once.`);
+      L.push(`3. Timing: one timing (${tl}), no correcting during it. Correct the errors right after.`);
+    } else if (o.focus === "retention") {
+      L.push(`1. Warm-up (about 1 min): a quick review of a few ${w} from this set so they stay strong.`);
+      L.push(`2. Move most practice to the next set: ${sprintN} sprints of ${sl} seconds on new ${w}, with correction right away.`);
+      L.push(`3. Retention check: after 7 or more days, one timing (${tl}) on this set with no practice first.`);
+    } else {
+      L.push(`1. Warm-up (about 1 min): model, lead, test for ${tList}.`);
+      L.push(`2. Practice sprints (about ${Math.max(2, o.mins - 3)} min): ${sprintN} sprints of ${sl} seconds, with a short break between sprints. Correct errors right away. Have the student try to beat their last sprint score.`);
+      L.push(`3. Timing: one timing (${tl}), no correcting during it. Correct the errors right after.`);
+    }
+    L.push(`${o.focus === "errors" || o.focus === "retention" ? "4" : o.focus === "accuracy" ? "5" : "4"}. Chart it: show the student the dot on the chart and point out a new best.`);
+    L.push("");
+    L.push("CHECK THE CHART");
+    L.push(`- After each timing, read the What to do next box.`);
+    L.push(`- If there is no new best in 3 timings in a row, change one thing (shorter sprints, a smaller set, or more error correction) and draw a phase change line.`);
+    L.push(`- When the aim is met on 2 days in a row, move on and check retention in 1 to 2 weeks.`);
+    if (o.notes.trim()) { L.push(""); L.push("NOTES"); L.push(o.notes.trim()); }
+    return L.join("\n");
+  }
+  function planView() {
+    const st = getStudent(ui.plan.sid), set = getSet(ui.plan.setId);
+    if (!st || !set) { view = { name: "home" }; return homeView(); }
+    const o = ui.plan, focusOpts = Object.entries(FOCUS).map(([k, v]) => `<option value="${k}" ${o.focus === k ? "selected" : ""}>${esc(v.split(":")[0])}${k === o.suggested ? " (suggested from the chart)" : ""}</option>`).join("");
+    const pseg = (key, opts) => `<div class="seg" role="group">${opts.map(([v, l]) => `<button data-plan="${key}" data-val="${v}" aria-pressed="${String(o[key]) === String(v)}">${l}</button>`).join("")}</div>`;
+    return shell(`<p style="margin:0 0 10px"><button class="linkbtn" data-open="${st.id}" data-openset="${set.id}">Back to ${esc(st.name)}</button></p>
+      <h2>Practice plan: ${esc(st.name)}, ${esc(set.name)}</h2>
+      <p class="note">Answer a few questions and the app drafts a plan from ${esc(st.name)}'s chart. Edit anything before you save it.</p>
+      <div class="panel"><div class="setup-grid">
+        <span>Days a week</span>${pseg("days", [[3, "3"], [4, "4"], [5, "5"]])}
+        <span>Minutes each session</span>${pseg("mins", [[5, "5 minutes"], [10, "10 minutes"], [15, "15 minutes"]])}
+        <span>Focus</span><div><select id="planFocus">${focusOpts}</select><p class="counts" style="margin:6px 0 0">${esc(FOCUS[o.focus])}</p></div>
+        <span>Target ${isSlides(set) ? "slides" : "letters"}</span><div><input type="text" id="planTargets" value="${esc(o.targets)}" style="width:100%" placeholder="for example: b d e"><p class="counts" style="margin:6px 0 0">Filled in from the items missed most in this phase. Change as needed.</p></div>
+        <span>Picture clues</span><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="planClues" ${o.clues ? "checked" : ""}> Include Sunform picture clues</label>
+        <span>Notes (optional)</span><input type="text" id="planNotes" value="${esc(o.notes)}" placeholder="for example: works best first thing in the morning">
+      </div>
+      <button class="btn primary" id="planMake">${o.text ? "Make the plan again" : "Make the plan"}</button></div>
+      ${o.text !== "" ? `<div class="panel"><h3>The plan</h3>
+        <textarea id="planText" rows="22" style="width:100%;font:inherit;font-size:0.95rem;line-height:1.45;border:1px solid var(--line);border-radius:10px;padding:10px 12px">${esc(o.text)}</textarea>
+        ${o.aiStatus ? `<p class="counts" style="margin:6px 0 0">${esc(o.aiStatus)}</p>` : ""}
+        <div class="row" style="margin-top:12px">
+          <button class="btn primary" id="planSave">Save plan</button>
+          <button class="btn" id="planSavePhase">Save and add a phase change line</button>
+          ${sampleCap ? `<button class="btn" id="planAI">Ask Claude to improve this plan</button>` : ""}
+          <button class="btn" id="planPdf">Download plan (PDF)</button>
+        </div>
+        <p class="counts" style="margin:8px 0 0">Add a phase change line when you start a new plan, so the chart shows whether it helped.${sampleCap ? " Ask Claude sends the chart numbers, set, aim, and your answers (not the student's name) and replaces the text above with a revised plan you can edit." : ""}</p>
+      </div>` : ""}`, "home");
+  }
+  function startPlan(st, set) {
+    const d = decide(st, set), saved = st.plans && st.plans[set.id];
+    const f = suggestedFocus(d);
+    ui.plan = { sid: st.id, setId: set.id, days: 5, mins: 10, focus: f, suggested: f, clues: data.settings.showClues !== false && !isSlides(set),
+      targets: d.missedList.slice(0, 5).join(" "), notes: "", text: saved ? saved.text : "", aiStatus: "" };
+    go("plan");
+  }
+  function readPlanFields() {
+    const o = ui.plan;
+    if ($("planFocus")) o.focus = $("planFocus").value;
+    if ($("planTargets")) o.targets = $("planTargets").value;
+    if ($("planClues")) o.clues = $("planClues").checked;
+    if ($("planNotes")) o.notes = $("planNotes").value;
+    if ($("planText")) o.text = $("planText").value;
+  }
+  function savePlan(addPhase) {
+    readPlanFields();
+    const o = ui.plan, st = getStudent(o.sid);
+    st.plans = Object.assign({}, st.plans || {}, { [o.setId]: { text: o.text, saved: Date.now(), focus: o.focus } });
+    if (addPhase) st.phases.push({ id: uid(), setId: o.setId, date: todayStr(), note: `New plan: ${FOCUS[o.focus].split(":")[0].toLowerCase()}` });
+    save();
+    ui.chartSet[st.id] = o.setId; ui.plan = null;
+    go("student", { id: st.id });
+  }
+  async function improvePlan(btn) {
+    readPlanFields();
+    const o = ui.plan, st = getStudent(o.sid), set = getSet(o.setId), e = effSet(st, set), d = decide(st, set);
+    const recent = chartedFor(st, set.id).slice(-10).map((x) => `${x.date}: ${r1(perMin(x.correct, x.seconds))} correct, ${r1(perMin(x.errors, x.seconds))} errors per minute`).join("\n") || "none yet";
+    const prompt = `You are helping a K-2 reading interventionist who uses Precision Teaching. Revise the practice plan below for one student. Use plain text with the same section headings (EACH SESSION, CHECK THE CHART, NOTES if any), short numbered steps, and no markdown symbols. Keep the first four lines (title, schedule, aim, focus) unless the data clearly calls for a different focus; if so, say why in one line. Keep it practical for ${o.mins}-minute sessions, ${o.days} days a week.
+Rules to keep: no correcting during charted timings (correct right after, with model, lead, test); during practice sprints, correct errors right away; ${isSlides(set) ? "slides are consonant plus short vowel and count as correct only when said smoothly without sounding out first" : "letter sounds only"}${o.clues ? "; the school uses Sunform picture clues, shown in parentheses" : ""}. Do not invent assessment results or research claims.
+
+Student data (set: ${set.name}; ${isSlides(set) ? "slides" : "letter sounds"}: ${set.items.join(" ")}; grade: ${st.grade ? GRADE_NAMES[st.grade] : "not set"}):
+Aim: ${e.aim} correct and ${e.errMax} or fewer errors per minute.
+Recent timings (oldest to newest):
+${recent}
+Celeration this phase: ${d.cel ? celText(d.cel.value) + " per week" : "not enough data yet"}.
+App's next step: ${d.title} ${d.text}
+Most missed: ${d.missedList.slice(0, 8).map((k) => `${withClue(k)} x${d.missed[k]}`).join(", ") || "none recorded"}.
+Teacher notes: ${o.notes || "none"}.
+
+Current plan:
+${o.text}`;
+    const label = btn.textContent;
+    btn.disabled = true; btn.textContent = "Asking Claude…";
+    o.aiStatus = "";
+    try {
+      const res = await sampleCap(prompt, { modelTier: "default", onText: ({ text }) => { const ta = $("planText"); if (ta) ta.value = text; } });
+      o.text = (res && res.text) || o.text;
+      o.aiStatus = "Revised by Claude. Read it over and edit before saving.";
+    } catch (err) {
+      if (err && err.code === "not_granted") { sampleCap = null; o.aiStatus = "Asking Claude isn't available here."; }
+      else if (err && err.code === "rate_limited") o.aiStatus = "Claude is busy right now. Try again in a minute.";
+      else o.aiStatus = "Claude couldn't revise the plan this time. Your plan above is unchanged.";
+      if (err && err.text) o.text = $("planText") ? $("planText").value : o.text;
+    } finally { btn.disabled = false; btn.textContent = label; render(); }
+  }
+  async function planPdf() {
+    readPlanFields();
+    const doc = new window.jspdf.jsPDF({ unit: "in", format: "letter", orientation: "portrait" });
+    const M = 0.75, PW = 7, BOTTOM = 10.3; let y = M;
+    ui.plan.text.split("\n").forEach((line, i) => {
+      const head = i === 0 || /^[A-Z ]+$/.test(line.trim()) && line.trim().length > 2;
+      doc.setFont("helvetica", head ? "bold" : "normal"); doc.setFontSize(i === 0 ? 15 : head ? 12 : 11);
+      const lines = line ? doc.splitTextToSize(line, PW) : [""];
+      lines.forEach((ln) => { if (y > BOTTOM) { doc.addPage(); y = M; } doc.text(ln, M, y); y += (i === 0 ? 0.3 : 0.22); });
+      if (head) y += 0.05;
+    });
+    const st = getStudent(ui.plan.sid), set = getSet(ui.plan.setId);
+    await download(`${st.name}-${set.name}-practice-plan.pdf`.replace(/[^A-Za-z0-9 ._-]/g, "").replace(/\s+/g, "-"), doc.output("blob"), "application/pdf");
+  }
+  function aimLineHTML(st, set) {
+    const e = effSet(st, set);
+    return `Aim: ${e.aim} correct per minute with ${e.errMax} or fewer errors${e.custom ? ` <strong>(${esc(st.name)}'s own aim)</strong>` : ""}. <button class="linkbtn" id="editAim" data-set="${set.id}">Change aim</button>`;
+  }
+  function aimEditHTML(st, set) {
+    const e = effSet(st, set);
+    return `<div class="rulebox" style="margin:6px 0 12px"><strong>Aim for ${esc(st.name)} on ${esc(set.name)}</strong>
+      <div class="row" style="align-items:flex-end;margin-top:8px">
+        <label class="f">Correct per minute<input type="number" id="aimC" min="1" value="${e.aim}"></label>
+        <label class="f">Error limit per minute<input type="number" id="aimE" min="0" value="${e.errMax}"></label>
+        <button class="btn primary" id="aimSave">Save for ${esc(st.name)}</button>
+        ${e.custom ? `<button class="btn" id="aimReset">Use the set's usual aim (${set.aim})</button>` : ""}
+        <button class="linkbtn" id="aimCancel">Cancel</button></div>
+      <p class="counts" style="margin:8px 0 0">This changes the aim only for ${esc(st.name)}. Other students keep the set's usual aim of ${set.aim}. To change it for everyone, edit the set on the Letter sets page.</p></div>`;
+  }
   function decisionHTML(d) {
     const cls = { go: "d-go", keep: "d-keep", change: "d-change", stop: "d-stop" }[d.tone];
     const bullets = d.bullets.slice();
@@ -974,11 +1149,13 @@
       ${lead ? `<p>${esc(lead)}</p>` : ""}
       ${bullets.length ? `<ul>${bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
       ${d.rule ? `<div class="rule">${esc(d.rule)}</div>` : ""}
+      <div class="row" style="margin-top:10px"><button class="btn small" id="makePlan">Help me make a practice plan</button></div>
     </div>`;
   }
 
   // ---------- Standard Celeration Chart (daily, semi-log) ----------
   function chartSVG(st, set) {
+    set = effSet(st, set);
     const sessions = sessionsFor(st, set.id), phases = phasesFor(st, set.id);
     const full = data.settings.range === "full";
     const yMin = full ? -3 : -1, yMax = 3, DAYS = 140;
@@ -1384,11 +1561,15 @@
         ${chooser}
         <h2 style="margin:0 0 10px">${isSlides(cs) ? "Slides" : "Letter sounds"}: ${esc(cs.name)}</h2>
         ${decisionHTML(d)}
+        ${st.plans && st.plans[cs.id] ? `<details class="panel" ${ui.planOpen === st.id + cs.id ? "open" : ""} id="planBox"><summary>Practice plan <span class="counts" style="font-weight:400">(saved ${new Date(st.plans[cs.id].saved).toLocaleDateString(undefined, { month: "short", day: "numeric" })})</span></summary>
+          <div style="white-space:pre-wrap;margin:10px 0 12px;font-size:0.95rem">${esc(st.plans[cs.id].text)}</div>
+          <div class="row"><button class="btn small" id="editPlan">Edit plan</button><button class="btn small danger" id="delPlan">Delete plan</button></div></details>` : ""}
         <div class="panel">
           <div class="row spread" style="margin-bottom:8px">
-            <div class="counts">Aim: ${cs.aim} correct per minute with ${cs.errMax} or fewer errors. ${d.cel ? `Celeration this phase: correct ${celText(d.cel.value)}${d.errCel ? `, errors ${celText(d.errCel.value)}` : ""} per week.` : ""}</div>
+            <div class="counts">${aimLineHTML(st, cs)} ${d.cel ? `Celeration this phase: correct ${celText(d.cel.value)}${d.errCel ? `, errors ${celText(d.errCel.value)}` : ""} per week.` : ""}</div>
             <div class="row">${seg("range", [["close", "Close-up"], ["full", "Full chart"]])}<button class="btn small" id="chartPdf" data-set="${cs.id}">Download chart (PDF)</button></div>
           </div>
+          ${ui.editAim === st.id + ":" + cs.id ? aimEditHTML(st, cs) : ""}
           <div class="chart-wrap">${chartSVG(st, cs)}</div>
           <div class="legend">
             <span><svg width="12" height="12"><circle cx="6" cy="6" r="5" fill="#2D5F8A"/></svg> Correct per minute</span>
@@ -1923,6 +2104,7 @@
     else if (view.name === "data") html = dataView();
     else if (view.name === "backup") html = backupView();
     else if (view.name === "today") html = todayView();
+    else if (view.name === "plan" && ui.plan) html = planView();
     else if (view.name === "sprint" && ui.sprintResult) html = sprintView();
     else if (view.name === "run" && run) html = runView();
     else if (view.name === "results" && pending) html = resultsView();
@@ -1968,6 +2150,21 @@
         save(); render();
       });
       if ($("copySetup")) $("copySetup").onclick = () => copySetupDialog(st);
+      if ($("makePlan")) $("makePlan").onclick = () => { const cs = $("editAim") && getSet($("editAim").dataset.set); if (cs) startPlan(st, cs); };
+      if ($("editPlan")) $("editPlan").onclick = () => { const cs = getSet($("editAim").dataset.set); startPlan(st, cs); };
+      if ($("delPlan")) $("delPlan").onclick = async () => { const id = $("editAim").dataset.set; if (await ask("Delete this practice plan?", "Delete", true)) { delete st.plans[id]; save(); render(); } };
+      if ($("planBox")) $("planBox").ontoggle = (e) => { ui.planOpen = e.target.open ? st.id + $("editAim").dataset.set : null; };
+      if ($("editAim")) $("editAim").onclick = () => { const k = st.id + ":" + $("editAim").dataset.set; ui.editAim = ui.editAim === k ? null : k; render(); };
+      if ($("aimCancel")) $("aimCancel").onclick = () => { ui.editAim = null; render(); };
+      if ($("aimSave")) $("aimSave").onclick = () => {
+        const id = $("editAim").dataset.set, a = Number($("aimC").value), e = Number($("aimE").value);
+        if (!(a > 0) || !(e >= 0)) { tell("Enter an aim of 1 or more and an error limit of 0 or more."); return; }
+        const set = getSet(id);
+        if (a === set.aim && e === set.errMax) { if (st.aims) delete st.aims[id]; }
+        else st.aims = Object.assign({}, st.aims || {}, { [id]: { aim: a, errMax: e } });
+        ui.editAim = null; save(); render();
+      };
+      if ($("aimReset")) $("aimReset").onclick = () => { const id = $("editAim").dataset.set; if (st.aims) delete st.aims[id]; ui.editAim = null; save(); render(); };
       document.querySelectorAll("[data-charttab]").forEach((b) => b.onclick = () => { ui.chartSet[st.id] = b.dataset.charttab; render(); });
       if ($("newSetFromStudent")) $("newSetFromStudent").onclick = () => openSetEditor(null, { name: "student", id: st.id }, kindOf(st));
       document.querySelectorAll("[data-kindpick]").forEach((b) => b.onclick = () => {
@@ -2161,6 +2358,16 @@
         render();
       };
       if ($("toResults")) $("toResults").onclick = () => { if (run.last === null) { run.tap = "last"; render(); return; } finishSheet(); };
+    }
+
+    if (view.name === "plan" && ui.plan) {
+      document.querySelectorAll("[data-plan]").forEach((b) => b.onclick = () => { readPlanFields(); ui.plan[b.dataset.plan] = Number(b.dataset.val); render(); });
+      $("planFocus").onchange = () => { readPlanFields(); render(); };
+      $("planMake").onclick = () => { readPlanFields(); const st = getStudent(ui.plan.sid), set = getSet(ui.plan.setId); ui.plan.text = buildPlan(ui.plan, st, set); ui.plan.aiStatus = ""; render(); };
+      if ($("planSave")) $("planSave").onclick = () => savePlan(false);
+      if ($("planSavePhase")) $("planSavePhase").onclick = () => savePlan(true);
+      if ($("planAI")) $("planAI").onclick = (e) => improvePlan(e.currentTarget);
+      if ($("planPdf")) $("planPdf").onclick = (e) => busy(e.currentTarget, planPdf);
     }
 
     if (view.name === "sprint" && ui.sprintResult) {
