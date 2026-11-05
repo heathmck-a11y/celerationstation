@@ -1152,7 +1152,8 @@ ${o.text}`;
       ${lead ? `<p>${esc(lead)}</p>` : ""}
       ${bullets.length ? `<ul>${bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
       ${d.rule ? `<div class="rule">${esc(d.rule)}</div>` : ""}
-      <div class="row" style="margin-top:10px"><button class="btn small" id="makePlan">Help me make a practice plan</button></div>
+      ${(() => { const urgent = d.tone === "stop" || d.tone === "change" || /first timing|New phase/i.test(d.title);
+        return `<div class="row" style="margin-top:12px"><button class="btn ${urgent ? "primary" : "small"}" id="makePlan">Help me make a practice plan now</button>${urgent ? `<span class="counts">Builds a plan from this chart that you can edit and save.</span>` : ""}</div>`; })()}
     </div>`;
   }
 
