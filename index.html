@@ -754,7 +754,7 @@
     finally { btn.disabled = false; btn.textContent = label; }
   }
   async function printProbe(btn, set, gradeKey, studentName, sid) {
-    const opts = { onePage: data.settings.probeLen !== "full", count: data.settings.probeCount || 1 };
+    const opts = { onePage: true, count: data.settings.probeCount || 1 };   // every probe is one page; students go back to the top if they finish
     const label = btn.textContent;
     btn.disabled = true; btn.textContent = "Making PDF…";
     try { await probePdf(set, gradeKey, studentName, sid, opts); render(); }
@@ -762,10 +762,7 @@
     finally { btn.disabled = false; btn.textContent = label; }
   }
   const gradeSelect = (id, value) => `<select id="${id}" aria-label="Grade level for the paper probe">${Object.entries(PROBE_GRADES).map(([k, g]) => `<option value="${k}" ${String(value || data.settings.probeGrade) === k ? "selected" : ""}>${g.label}</option>`).join("")}</select>`;
-  const probeOptsHTML = () => `<select id="probeLen" aria-label="Probe length">
-      <option value="one" ${data.settings.probeLen !== "full" ? "selected" : ""}>1 page per probe</option>
-      <option value="full" ${data.settings.probeLen === "full" ? "selected" : ""}>Full length (2 to 3 pages)</option></select>
-    <select id="probeCount" aria-label="How many probes">${[1, 2, 3, 4, 5].map((n) => `<option value="${n}" ${Number(data.settings.probeCount || 1) === n ? "selected" : ""}>${n} probe${n > 1 ? "s" : ""}</option>`).join("")}</select>`;
+  const probeOptsHTML = () => `<select id="probeCount" aria-label="How many probes">${[1, 2, 3, 4, 5].map((n) => `<option value="${n}" ${Number(data.settings.probeCount || 1) === n ? "selected" : ""}>${n} probe${n > 1 ? "s" : ""}</option>`).join("")}</select>`;
   const GRADE_NAMES = { K: "Kindergarten", "1": "1st grade", "2": "2nd grade" };
 
   // ---------- celeration math ----------
@@ -1322,7 +1319,8 @@
           <span>Timing length</span>${sseg("seconds", [[30, "30 seconds"], [60, "1 minute"]])}
           <span>Show letters</span>${sseg("mode", [["sheet", "Full page (computer)"], ["cards", "One at a time (computer)"], ["paper", "Printed probe (student reads from paper)"]]).replace('class="seg"', 'class="seg stack"')}
           ${isPaper ? `<span>Printed probe</span><div><div class="row" style="gap:8px;margin-bottom:8px">${gradeSelect("probeGrade", st.grade)}${probeOptsHTML()}</div>
-            <button class="btn" id="printProbe">Print paper probe (PDF)</button></div>` : ""}
+            <button class="btn" id="printProbe">Print paper probe (PDF)</button>
+            <p class="counts" style="margin:6px 0 0">Each probe is one page. If the student finishes the page, they go back to the top and keep going.</p></div>` : ""}
         </div>
         ${isPaper ? (paperProbes.length ? `<div class="row" style="margin-bottom:12px">
             <label class="f" style="flex-direction:row;align-items:center;gap:8px">Probe the student has<select id="paperProbe">${paperProbes.map((p) => `<option value="${p.id}">${esc(probeLabel(p))}</option>`).join("")}</select></label></div>
@@ -1933,7 +1931,6 @@
     document.querySelectorAll("[data-unhide]").forEach((b) => b.onclick = () => { const x = getStudent(b.dataset.unhide); if (x) { x.hidden = false; save(); render(); } });
     if ($("retrySave")) $("retrySave").onclick = () => save();
     if ($("qrOpen")) $("qrOpen").onclick = showQR;
-    if ($("probeLen")) $("probeLen").onchange = (e) => { data.settings.probeLen = e.target.value; save(); };
     if ($("probeCount")) $("probeCount").onchange = (e) => { data.settings.probeCount = Number(e.target.value); save(); };
     document.querySelectorAll("[data-setting]").forEach((b) => b.onclick = () => {
       const k = b.dataset.setting, v = b.dataset.val;
