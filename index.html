@@ -90,6 +90,9 @@
   .student-list li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
   .student-list li:first-child { border-top: none; }
   .student-list li.slim { padding: 3px 0; gap: 8px; }
+  .student-list li.grade-head { display: block; font-family: "Fredoka", var(--font); font-weight: 600; font-size: 1.05rem; color: var(--blue); padding: 12px 0 4px; border-top: none; }
+  .student-list li.grade-head:first-child { padding-top: 0; }
+  .student-list li.grade-head + li { border-top: 1px solid var(--line); }
   .student-list li.slim .slim-text { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; min-width: 0; }
   .student-list li.slim .student-name { font-size: 1.02rem; }
   .student-list li.slim .btn { padding: 2px 12px; font-size: 0.88rem; }
@@ -1314,13 +1317,17 @@ ${o.text}`;
   function homeView() {
     const list = sortedStudents().filter((s) => !s.hidden);
     const hidden = sortedStudents().filter((s) => s.hidden);
-    const rows = list.map((s) => {
+    const row = (s) => {
       const lastS = s.sessions.slice().sort((a, b) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0))[0];
       const set = lastS && getSet(lastS.setId);
       const info = lastS ? `Last timing ${fmtDate(lastS.date)}: ${r1(perMin(lastS.correct, lastS.seconds))} correct per minute on ${esc(set ? set.name : lastS.setName || "a deleted set")}` : "No timings yet";
       return `<li class="slim"><div class="slim-text"><span class="student-name">${esc(s.name)}</span>${setChipsHTML(s)}<span class="counts">${info}</span></div>
         <div class="row"><button class="btn primary small" data-open="${s.id}">Open</button></div></li>`;
-    }).join("");
+    };
+    // grouped by grade
+    const groups = [["K", "Kindergarten"], ["1", "1st grade"], ["2", "2nd grade"], ["", "Grade not set"]]
+      .map(([k, label]) => [label, list.filter((s) => (s.grade || "") === k)]).filter(([, g]) => g.length);
+    const rows = groups.map(([label, g]) => `<li class="grade-head">${label} <span class="counts">(${g.length})</span></li>${g.map(row).join("")}`).join("");
     return shell(`<h2>Students</h2>
       <p class="note">Open a student to do a timing, see their celeration chart, and get the next step. ${mode === "claude" ? "Saving to your Claude account." : ""}</p>
       <div class="panel"><div class="row">
@@ -1599,7 +1606,7 @@ ${o.text}`;
       <div class="row spread" style="margin-bottom:16px"><div class="row"><h2 style="margin:0">${esc(st.name)}</h2>
           ${setChipsHTML(st, startSet)}
           </div>
-        <div class="row"><button class="btn small" id="copySetup">Copy setup to another student</button><button class="btn small" id="rename">Rename</button><button class="btn small" id="toggleHide">${st.hidden ? "Unhide" : "Hide"}</button><button class="btn small danger" id="delStudent">Remove student</button></div></div>
+        <div class="row"><select id="stGrade" aria-label="Grade" class="btn small" style="padding:4px 8px"><option value="">Grade not set</option>${Object.entries(GRADE_NAMES).map(([k, v]) => `<option value="${k}" ${st.grade === k ? "selected" : ""}>${v}</option>`).join("")}</select><button class="btn small" id="copySetup">Copy setup to another student</button><button class="btn small" id="rename">Rename</button><button class="btn small" id="toggleHide">${st.hidden ? "Unhide" : "Hide"}</button><button class="btn small danger" id="delStudent">Remove student</button></div></div>
       ${st.hidden ? `<div class="panel" style="background:var(--blue-soft);border-color:#B2D9D4">This student is hidden. Their timings are saved, but they are left out of the Today page.</div>` : ""}
       ${startPanel}
       ${sprintPanel}
