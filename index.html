@@ -1584,7 +1584,7 @@
           <button data-setting="markStyle" data-val="hidden" aria-pressed="${(data.settings.markStyle || "hidden") === "hidden"}">Hidden</button>
           <button data-setting="markStyle" data-val="red" aria-pressed="${data.settings.markStyle === "red"}">Red</button></div>
         <p class="note" style="margin-top:-6px">With Hidden, the letter doesn't change when you tap it. The error count and Undo last mark are at the top by the timer. All marks show in red when time is up so you can check them.</p>` : ""}
-        ${errorRuleHTML(run.slide)}
+        ${errorRuleHTML(run.slide, run.practice)}
         <p class="note">The timer starts when you press Start.</p>
         <button class="btn primary" id="go" style="font-size:1.2rem;padding:12px 28px">Start</button>
       </div></div></div>`;
@@ -1629,21 +1629,27 @@
     const pp = run.probePages || 1, pg = run.page % pp, pass = Math.floor(run.page / pp) + 1;
     return `${pp > 1 ? `Student page ${pg + 1} of ${pp}` : "Probe page"}${pass > 1 ? `, time through ${pass}` : ""}`;
   }
-  function errorRuleHTML(slide) {
+  function errorRuleHTML(slide, practice) {
     const w = slide ? "slide" : "letter";
     return `${slide ? `<div class="rulebox" style="background:var(--warn-bg);border-color:var(--warn-line)"><strong>What counts as correct for a slide</strong>
       <ul>
         <li>The student says the slide smoothly as one unit, without sounding it out first. For example, "ma," not "/m/ ... /a/ ... ma."</li>
         <li>If the student sounds out the separate sounds first, mark it as an error, even if they blend it correctly after.</li>
       </ul>
-      <p style="margin:8px 0 0"><strong>Reminder: slides are said with short vowel sounds only (ma as in map, not "may").</strong></p></div>` : ""}<div class="rulebox"><strong>If the student makes an error or doesn't know it</strong>
+      <p style="margin:8px 0 0"><strong>Reminder: slides are said with short vowel sounds only (ma as in map, not "may").</strong></p></div>` : ""}${practice ? `<div class="rulebox"><strong>If the student makes an error or doesn't know it (practice sprint)</strong>
+      <ul>
+        <li><strong>Correct it right away.</strong> Say the ${slide ? "slide" : "sound"} ("${slide ? "ma" : "/m/"}"), have the student say it back, then point to the next ${w}. The timer keeps running.</li>
+        <li>No answer after about 3 seconds: give the ${slide ? "slide" : "sound"} the same way and move on.</li>
+        <li>Tap it as an error so you can see what was missed at the end.</li>
+        <li>Sprints are practice, so a lower score from stopping to correct doesn't matter. Charted timings are different: no correcting until the timing is over.</li>
+      </ul></div>` : `<div class="rulebox"><strong>If the student makes an error or doesn't know it</strong>
       <ul>
         <li><strong>During the timing, don't correct or say the sound.</strong> Mark it as an error and let the student keep going.</li>
         <li>No answer after about 3 seconds: mark it, then point to the next ${w} and say "Next."</li>
         <li>If the student fixes it on their own within about 3 seconds, it counts as correct.</li>
         <li>Don't say "good" or "no" during the timing. Stay neutral.</li>
         <li><strong>Right after the timing, correct the errors.</strong> For each missed ${w}: model ("This says ${slide ? "ma" : "/m/"}"), lead ("Say it with me"), test ("What does it say?").</li>
-      </ul></div>`;
+      </ul></div>`}`;
   }
   function correctNowHTML(errList, slide) {
     if (!errList.length) return "";
