@@ -1318,7 +1318,7 @@ ${o.text}`;
       const lastS = s.sessions.slice().sort((a, b) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0))[0];
       const set = lastS && getSet(lastS.setId);
       const info = lastS ? `Last timing ${fmtDate(lastS.date)}: ${r1(perMin(lastS.correct, lastS.seconds))} correct per minute on ${esc(set ? set.name : lastS.setName || "a deleted set")}` : "No timings yet";
-      return `<li class="slim"><div class="slim-text"><span class="student-name">${esc(s.name)}</span>${s.grade ? `<span class="counts">${GRADE_NAMES[s.grade]}</span>` : ""}${setChipsHTML(s)}<span class="counts">${info}</span></div>
+      return `<li class="slim"><div class="slim-text"><span class="student-name">${esc(s.name)}</span>${setChipsHTML(s)}<span class="counts">${info}</span></div>
         <div class="row"><button class="btn primary small" data-open="${s.id}">Open</button></div></li>`;
     }).join("");
     return shell(`<h2>Students</h2>
@@ -1372,7 +1372,7 @@ ${o.text}`;
     const body = sorted.map(({ st, set, d, last }) => {
       const stale = dayNum(today) - dayNum(last.date);
       return `<tr>
-        <td><button class="linkbtn" data-open="${st.id}" data-openset="${set.id}">${esc(st.name)}</button>${st.grade ? `<br><small class="counts">${GRADE_NAMES[st.grade]}</small>` : ""}</td>
+        <td><button class="linkbtn" data-open="${st.id}" data-openset="${set.id}">${esc(st.name)}</button></td>
         <td><small class="counts">${isSlides(set) ? "Slides" : "Letter sounds"}</small><br>${esc(set.name)}</td>
         <td>${fmtDate(last.date)}${stale >= 7 ? `<br><small style="color:var(--unknown)">${stale} days ago</small>` : ""}</td>
         <td>${r1(perMin(last.correct, last.seconds))} / ${r1(perMin(last.errors, last.seconds))}</td>
@@ -1598,7 +1598,7 @@ ${o.text}`;
       <p style="margin:0 0 10px"><button class="linkbtn" data-nav="home">All students</button></p>
       <div class="row spread" style="margin-bottom:16px"><div class="row"><h2 style="margin:0">${esc(st.name)}</h2>
           ${setChipsHTML(st, startSet)}
-          <select id="stGrade" aria-label="Grade"><option value="">Grade not set</option>${Object.entries(GRADE_NAMES).map(([k, v]) => `<option value="${k}" ${st.grade === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+          </div>
         <div class="row"><button class="btn small" id="copySetup">Copy setup to another student</button><button class="btn small" id="rename">Rename</button><button class="btn small" id="toggleHide">${st.hidden ? "Unhide" : "Hide"}</button><button class="btn small danger" id="delStudent">Remove student</button></div></div>
       ${st.hidden ? `<div class="panel" style="background:var(--blue-soft);border-color:#B2D9D4">This student is hidden. Their timings are saved, but they are left out of the Today page.</div>` : ""}
       ${startPanel}
