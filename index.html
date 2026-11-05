@@ -1420,11 +1420,44 @@ ${o.text}`;
     out.kind = kindOf(st);
     return out;
   }
+  function setupSummary(st) {
+    const su = currentSetup(st), set = su.setId && getSet(su.setId);
+    return [`Timing: ${su.kind === "slides" ? "slides" : "letter sounds"}`, set ? `${isSlides(set) ? "Slide" : "Letter"} set: ${set.name}` : null, st.grade ? `Grade: ${GRADE_NAMES[st.grade]}` : null,
+      `Timing length: ${fmtLen(su.seconds)}`, `Show letters: ${su.mode === "cards" ? "one at a time (computer)" : su.mode === "paper" ? "printed probe (student reads from paper)" : "full page (computer)"}`, `Sprint length: ${fmtLen(su.sprintSeconds)}`].filter(Boolean);
+  }
+  function applySetup(from, to) {
+    const su = currentSetup(from);
+    to.setup = Object.assign({}, su);
+    if (from.grade) to.grade = from.grade;
+    if (su.setId) { ui.startSet[to.id] = su.setId; ui.chartSet[to.id] = su.setId; }
+  }
+  function copyFromDialog(st) {
+    const others = sortedStudents().filter((x) => x.id !== st.id);
+    if (!others.length) { tell("There are no other students to copy from yet."); return; }
+    const back = document.createElement("div");
+    back.className = "modal-back"; back.id = "modal";
+    const list = (id) => `<ul style="margin:0 0 12px;padding-left:20px;color:var(--muted)">${setupSummary(getStudent(id)).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>`;
+    back.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
+      <p><strong>Copy a setup to ${esc(st.name)}</strong></p>
+      <label class="f" style="margin-bottom:10px">Copy from<select id="cfSource">${others.map((x) => `<option value="${x.id}">${esc(x.name)}${x.hidden ? " (hidden)" : ""}</option>`).join("")}</select></label>
+      <div id="cfSummary">${list(others[0].id)}</div>
+      <p class="counts" style="margin:0 0 14px">${esc(st.name)}'s current setup is replaced. ${esc(st.name)}'s timings, phase change lines, and charts are not changed.</p>
+      <div class="row"><button class="btn" id="cfCancel">Cancel</button><button class="btn primary" id="cfOk">Copy setup</button></div></div>`;
+    document.body.appendChild(back);
+    const sel = back.querySelector("#cfSource");
+    const done = () => { back.remove(); document.removeEventListener("keydown", key, true); };
+    const ok = () => { const from = getStudent(sel.value); if (!from) return; applySetup(from, st); save(); done(); render(); tell(`Copied ${from.name}'s setup to ${st.name}.`); };
+    const key = (e) => { if (e.key === "Escape") { e.preventDefault(); done(); } else if (e.key === "Enter") { e.preventDefault(); ok(); } };
+    sel.onchange = () => { back.querySelector("#cfSummary").innerHTML = list(sel.value); };
+    back.querySelector("#cfOk").onclick = ok;
+    back.querySelector("#cfCancel").onclick = done;
+    document.addEventListener("keydown", key, true);
+    sel.focus();
+  }
   function copySetupDialog(st) {
     const others = sortedStudents().filter((x) => x.id !== st.id);
-    const su = currentSetup(st), set = su.setId && getSet(su.setId);
-    const summary = [`Timing: ${su.kind === "slides" ? "slides" : "letter sounds"}`, set ? `${isSlides(set) ? "Slide" : "Letter"} set: ${set.name}` : null, st.grade ? `Grade: ${GRADE_NAMES[st.grade]}` : null,
-      `Timing length: ${fmtLen(su.seconds)}`, `Show letters: ${su.mode === "cards" ? "one at a time (computer)" : su.mode === "paper" ? "printed probe (student reads from paper)" : "full page (computer)"}`, `Sprint length: ${fmtLen(su.sprintSeconds)}`].filter(Boolean);
+    const su = currentSetup(st);
+    const summary = setupSummary(st);
     const back = document.createElement("div");
     back.className = "modal-back"; back.id = "modal";
     back.innerHTML = `<div class="modal" role="dialog" aria-modal="true">
@@ -1607,7 +1640,7 @@ ${o.text}`;
       <div class="row spread" style="margin-bottom:16px"><div class="row"><h2 style="margin:0">${esc(st.name)}</h2>
           ${setChipsHTML(st, startSet)}
           </div>
-        <div class="row"><select id="stGrade" aria-label="Grade" class="btn small" style="padding:4px 8px"><option value="">Grade not set</option>${Object.entries(GRADE_NAMES).map(([k, v]) => `<option value="${k}" ${st.grade === k ? "selected" : ""}>${v}</option>`).join("")}</select><button class="btn small" id="copySetup">Copy setup to another student</button><button class="btn small" id="rename">Rename</button><button class="btn small" id="toggleHide">${st.hidden ? "Unhide" : "Hide"}</button><button class="btn small danger" id="delStudent">Remove student</button></div></div>
+        <div class="row"><select id="stGrade" aria-label="Grade" class="btn small" style="padding:4px 8px"><option value="">Grade not set</option>${Object.entries(GRADE_NAMES).map(([k, v]) => `<option value="${k}" ${st.grade === k ? "selected" : ""}>${v}</option>`).join("")}</select><button class="btn small" id="copyFrom">Copy setup from another student</button><button class="btn small" id="copySetup">Copy setup to another student</button><button class="btn small" id="rename">Rename</button><button class="btn small" id="toggleHide">${st.hidden ? "Unhide" : "Hide"}</button><button class="btn small danger" id="delStudent">Remove student</button></div></div>
       ${st.hidden ? `<div class="panel" style="background:var(--blue-soft);border-color:#B2D9D4">This student is hidden. Their timings are saved, but they are left out of the Today page.</div>` : ""}
       ${startPanel}
       ${sprintPanel}
@@ -2158,6 +2191,7 @@ ${o.text}`;
         save(); render();
       });
       if ($("copySetup")) $("copySetup").onclick = () => copySetupDialog(st);
+      if ($("copyFrom")) $("copyFrom").onclick = () => copyFromDialog(st);
       if ($("makePlan")) $("makePlan").onclick = () => { const cs = $("editAim") && getSet($("editAim").dataset.set); if (cs) startPlan(st, cs); };
       if ($("editPlan")) $("editPlan").onclick = () => { const cs = getSet($("editAim").dataset.set); startPlan(st, cs); };
       if ($("delPlan")) $("delPlan").onclick = async () => { const id = $("editAim").dataset.set; if (await ask("Delete this practice plan?", "Delete", true)) { delete st.plans[id]; save(); render(); } };
