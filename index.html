@@ -180,6 +180,11 @@
   .qr-mini { flex: none; width: 58px; height: 58px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: #fff; overflow: hidden; line-height: 0; }
   .qr-mini svg, .qr-big svg { width: 100%; height: 100%; display: block; }
   .qr-big { width: min(260px, 70vw); height: min(260px, 70vw); margin: 0 auto; }
+  .setchips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+  .setchip { border: 1px solid #B2D9D4; background: var(--blue-soft); color: var(--blue); border-radius: 999px; padding: 2px 11px; font-size: 0.85rem; line-height: 1.5; }
+  .setchip b { font-weight: 700; }
+  .setchip:hover { border-color: var(--blue); }
+  .setchip.on { background: var(--blue); color: #fff; border-color: var(--blue); }
   .chart-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
   .chart-tabs button { text-align: left; border: 1.5px solid var(--line); background: #fff; border-radius: 10px; padding: 6px 14px; line-height: 1.25; }
   .chart-tabs button[aria-selected="true"] { border-color: var(--blue); background: var(--blue); color: #fff; }
@@ -1106,6 +1111,23 @@
       </main>`;
   }
 
+  // Buttons for each set a student has been timed on, most recent first. Tapping one opens that set and chart.
+  function setChipsHTML(st, currentId) {
+    const last = {};
+    st.sessions.forEach((x) => { if (getSet(x.setId) && (!last[x.setId] || x.date > last[x.setId])) last[x.setId] = x.date; });
+    const ids = Object.keys(last).sort((a, b) => last[b].localeCompare(last[a]));
+    if (!ids.length) return "";
+    return `<span class="setchips">${ids.map((id) => { const x = getSet(id);
+      return `<button class="setchip${id === currentId ? " on" : ""}" data-gostudent="${st.id}" data-goset="${id}" title="Time ${esc(x.name)} and see its chart">${isSlides(x) ? "<b>Slides:</b> " : ""}${esc(x.name)}</button>`; }).join("")}</span>`;
+  }
+  function openStudentSet(sid, setId) {
+    const st = getStudent(sid), set = getSet(setId);
+    if (!st || !set) return;
+    ui.startSet[sid] = setId; ui.chartSet[sid] = setId;
+    st.setup = Object.assign({}, st.setup || {}, { setId, kind: setKind(set) });
+    save();
+    go("student", { id: sid });
+  }
   function homeView() {
     const list = sortedStudents().filter((s) => !s.hidden);
     const hidden = sortedStudents().filter((s) => s.hidden);
@@ -1113,7 +1135,7 @@
       const lastS = s.sessions.slice().sort((a, b) => b.date.localeCompare(a.date) || (b.at || 0) - (a.at || 0))[0];
       const set = lastS && getSet(lastS.setId);
       const info = lastS ? `Last timing ${fmtDate(lastS.date)}: ${r1(perMin(lastS.correct, lastS.seconds))} correct per minute on ${esc(set ? set.name : lastS.setName || "a deleted set")}` : "No timings yet";
-      return `<li class="slim"><div class="slim-text"><span class="student-name">${esc(s.name)}</span>${s.grade ? `<span class="counts">${GRADE_NAMES[s.grade]}</span>` : ""}<span class="counts">${info}</span></div>
+      return `<li class="slim"><div class="slim-text"><span class="student-name">${esc(s.name)}</span>${s.grade ? `<span class="counts">${GRADE_NAMES[s.grade]}</span>` : ""}${setChipsHTML(s)}<span class="counts">${info}</span></div>
         <div class="row"><button class="btn primary small" data-open="${s.id}">Open</button></div></li>`;
     }).join("");
     return shell(`<h2>Students</h2>
@@ -1387,6 +1409,7 @@
     return shell(`
       <p style="margin:0 0 10px"><button class="linkbtn" data-nav="home">All students</button></p>
       <div class="row spread" style="margin-bottom:16px"><div class="row"><h2 style="margin:0">${esc(st.name)}</h2>
+          ${setChipsHTML(st, startSet)}
           <select id="stGrade" aria-label="Grade"><option value="">Grade not set</option>${Object.entries(GRADE_NAMES).map(([k, v]) => `<option value="${k}" ${st.grade === k ? "selected" : ""}>${v}</option>`).join("")}</select></div>
         <div class="row"><button class="btn small" id="copySetup">Copy setup to another student</button><button class="btn small" id="rename">Rename</button><button class="btn small" id="toggleHide">${st.hidden ? "Unhide" : "Hide"}</button><button class="btn small danger" id="delStudent">Remove student</button></div></div>
       ${st.hidden ? `<div class="panel" style="background:var(--blue-soft);border-color:#B2D9D4">This student is hidden. Their timings are saved, but they are left out of the Today page.</div>` : ""}
@@ -1899,6 +1922,7 @@
   function bind() {
     document.querySelectorAll("[data-nav]").forEach((b) => b.onclick = () => go(b.dataset.nav));
     document.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => { if (b.dataset.openset) ui.chartSet[b.dataset.open] = b.dataset.openset; go("student", { id: b.dataset.open }); });
+    document.querySelectorAll("[data-gostudent]").forEach((b) => b.onclick = () => openStudentSet(b.dataset.gostudent, b.dataset.goset));
     document.querySelectorAll("[data-todaysort]").forEach((b) => b.onclick = () => { ui.todaySort = b.dataset.todaysort; render(); });
     document.querySelectorAll("[data-unhide]").forEach((b) => b.onclick = () => { const x = getStudent(b.dataset.unhide); if (x) { x.hidden = false; save(); render(); } });
     if ($("retrySave")) $("retrySave").onclick = () => save();
