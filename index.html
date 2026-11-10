@@ -465,11 +465,21 @@
   }
   // Built-in "All 26 letters" set. If the teacher deletes it, it stays deleted.
   const ALL_ID = "all-26-letters";
+  const SET1_ID = "letter-set-1";
+  const SET1 = ["s", "t", "r", "m", "b"];
   function ensureDefaultSets() {
     // one time: slide sets still at the old starting aim of 60 move to the slide aim of 40
     if (!data.settings.slideAim40) {
       data.sets.forEach((x) => { if (x.kind === "slides" && Number(x.aim) === DEFAULT_AIM) x.aim = SLIDE_AIM; });
       data.settings.slideAim40 = true;
+      save();
+    }
+    // Built-in "Letter set 1" (s, t, r, m, b). Added one time; if the teacher deletes it, it stays deleted.
+    if (!data.settings.set1Added) {
+      if (!data.sets.some((x) => x.id === SET1_ID || String(x.name || "").trim().toLowerCase() === "letter set 1")) {
+        data.sets.push({ id: SET1_ID, name: "Letter set 1", items: SET1.slice(), aim: DEFAULT_AIM, errMax: DEFAULT_ERR, kind: "letters", builtin: true, created: todayStr() });
+      }
+      data.settings.set1Added = true;
       save();
     }
     if (data.settings.noAllLetters || data.sets.some((x) => x.id === ALL_ID)) return;
@@ -1704,6 +1714,7 @@ ${o.text}`;
       ${kindSeg}
       <div class="panel">
         <div class="row" style="margin-bottom:6px"><span class="counts">Quick picks:</span>
+          <button class="btn small" data-preset="set1">Letter set 1</button>
           <button class="btn small" data-preset="bak1">BAK 1 letters</button>
           <button class="btn small" data-preset="all">All 26 letters</button>
           <button class="btn small" data-preset="vowels">Short vowels</button>
@@ -2289,8 +2300,9 @@ ${o.text}`;
       document.querySelectorAll("[data-preset]").forEach((b) => b.onclick = () => {
         readDraftFields();
         const p = b.dataset.preset;
-        draft.items = p === "bak1" ? BAK1.slice() : p === "all" ? LETTERS.slice() : p === "vowels" ? VOWELS.slice() : [];
+        draft.items = p === "set1" ? SET1.slice() : p === "bak1" ? BAK1.slice() : p === "all" ? LETTERS.slice() : p === "vowels" ? VOWELS.slice() : [];
         if (p === "bak1" && !draft.name.trim()) draft.name = "BAK 1 letters";
+        if (p === "set1" && !draft.name.trim()) draft.name = "Letter set 1";
         render();
       });
       document.querySelectorAll("[data-kind]").forEach((b) => b.onclick = () => {
